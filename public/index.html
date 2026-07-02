@@ -1,27 +1,236 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello, World!</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: Garamond, "EB Garamond", "Adobe Garamond Pro", Georgia, serif;
-    }
-
-    h1 {
-      font-weight: 400;
-      font-size: clamp(2rem, 8vw, 4rem);
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Org Builder — sơ đồ &amp; bảng phân cấp</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.45 system-ui,"Segoe UI",Arial,sans-serif;color:#111;background:#fff}
+  header{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px;border-bottom:1px solid #ddd;position:sticky;top:0;background:#fff;z-index:5}
+  header h1{font-size:15px;margin:0 10px 0 0;font-weight:600}
+  button{font:inherit;padding:6px 10px;border:1px solid #333;background:#fff;cursor:pointer;border-radius:3px}
+  button:hover{background:#f0f0f0}
+  button.primary{background:#111;color:#fff;border-color:#111}
+  button.primary:hover{background:#333}
+  button.danger{color:#a00;border-color:#a00}
+  #msg{color:#0a6;font-size:12.5px;margin-left:4px}
+  main{display:flex;min-height:430px}
+  #canvasWrap{flex:1;overflow:auto;background:#fafafa}
+  #canvas{position:relative;min-width:100%;min-height:430px}
+  #svg{position:absolute;left:0;top:0;pointer-events:none}
+  .node{position:absolute;width:170px;height:58px;border:1px solid #333;background:#fff;padding:6px 8px;cursor:pointer;overflow:hidden;border-radius:3px}
+  .node.sel{border-width:2px;background:#ececec}
+  .node .nm{font-size:12.5px;line-height:1.25;max-height:32px;overflow:hidden;word-wrap:break-word;margin-top:2px}
+  .node .tt{position:absolute;right:5px;top:3px;font-size:10.5px;color:#777}
+  #panel{width:250px;border-left:1px solid #ddd;padding:12px;flex:none}
+  #panel h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#555}
+  #panel label{display:block;font-size:12px;color:#555;margin:10px 0 3px}
+  #panel input,#panel select{width:100%;font:inherit;padding:6px;border:1px solid #bbb;border-radius:3px}
+  .row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+  .hint{color:#888;font-size:12.5px}
+  #tableSec{border-top:1px solid #ddd;padding:12px}
+  #tableSec h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#555}
+  .tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:13px}
+  table{border-collapse:collapse;font-size:13px}
+  th,td{border:1px solid #999;padding:4px 9px;text-align:left}
+  th{background:#f2f2f2;font-weight:600}
+  @media(max-width:760px){main{flex-direction:column}#panel{width:auto;border-left:none;border-top:1px solid #ddd}}
+</style>
 </head>
 <body>
-  <h1>Hello, World!</h1>
+<header>
+  <h1>Org Builder</h1>
+  <button id="bRoot" class="primary">＋ Box gốc</button>
+  <button id="bSave">Lưu JSON</button>
+  <button id="bOpen">Mở JSON</button>
+  <button id="bCopy">Copy bảng</button>
+  <button id="bDrawio">Xuất .drawio</button>
+  <input type="file" id="fileIn" accept=".json,application/json" hidden>
+  <span id="msg"></span>
+</header>
+
+<main>
+  <div id="canvasWrap"><div id="canvas"><svg id="svg"></svg></div></div>
+  <div id="panel"></div>
+</main>
+
+<section id="tableSec">
+  <h2>Bảng phân cấp (tự cập nhật)</h2>
+  <div class="tools">
+    <label><input type="checkbox" id="ckT"> Hiện cấp T trong bảng</label>
+  </div>
+  <div id="tblHost"></div>
+</section>
+
+<script>
+"use strict";
+var BW=170, BH=58, GX=18, GY=70, PAD=20;
+var nodes=new Map(), rootIds=[], sel=null, seq=1;
+function $(id){return document.getElementById(id)}
+function msg(t){var m=$('msg');m.textContent=t;clearTimeout(msg._t);msg._t=setTimeout(function(){m.textContent=''},2500)}
+
+/* ---------- model ---------- */
+function nn(name,t,parent){var id='n'+(seq++);nodes.set(id,{id:id,name:name,t:t,parent:parent,children:[]});return id}
+function addRoot(){var id=nn('Chức danh mới', rootIds.length? '' : 'T1', null);rootIds.push(id);select(id,true)}
+function addChild(pid){var p=nodes.get(pid);var pt=parseInt((p.t||'').slice(1));
+  var t=isNaN(pt)?'':('T'+Math.min(8,pt+1));
+  var id=nn('Chức danh mới',t,pid);p.children.push(id);select(id,true)}
+function addSib(id){var n=nodes.get(id);var nid=nn('Chức danh mới',n.t,n.parent);
+  var arr=n.parent?nodes.get(n.parent).children:rootIds;
+  arr.splice(arr.indexOf(id)+1,0,nid);select(nid,true)}
+function subCount(id){var n=nodes.get(id);var s=1;n.children.forEach(function(c){s+=subCount(c)});return s}
+function wipe(id){var n=nodes.get(id);n.children.forEach(wipe);nodes.delete(id)}
+function delNode(id){var n=nodes.get(id);
+  if(n.children.length && !confirm('Xóa "'+(n.name||'')+'" cùng '+(subCount(id)-1)+' box cấp dưới?'))return;
+  var arr=n.parent?nodes.get(n.parent).children:rootIds;
+  arr.splice(arr.indexOf(id),1);wipe(id);sel=null;renderAll()}
+function moveSib(id,dir){var n=nodes.get(id);var arr=n.parent?nodes.get(n.parent).children:rootIds;
+  var i=arr.indexOf(id),j=i+dir;if(j<0||j>=arr.length)return;
+  var tmp=arr[i];arr[i]=arr[j];arr[j]=tmp;renderAll()}
+function select(id,focus){sel=id;renderAll();
+  if(focus){var f=$('fName');if(f){f.focus();f.select()}}}
+
+/* ---------- layout: rank theo độ sâu, con xếp dưới cha ---------- */
+function layout(){var X=new Map(),D=new Map(),next=0;
+  function walk(id,d){D.set(id,d);var n=nodes.get(id);
+    if(!n.children.length){X.set(id,next++);return next-1}
+    var xs=n.children.map(function(c){return walk(c,d+1)});
+    var x=(xs[0]+xs[xs.length-1])/2;X.set(id,x);return x}
+  rootIds.forEach(function(r,i){if(i)next+=0.5;walk(r,0)});
+  return {X:X,D:D}}
+
+/* ---------- render ---------- */
+function renderCanvas(){var cv=$('canvas'),svg=$('svg');
+  cv.querySelectorAll('.node').forEach(function(e){e.remove()});
+  while(svg.firstChild)svg.removeChild(svg.firstChild);
+  var L=layout(),maxX=0,maxD=0;
+  L.X.forEach(function(v){if(v>maxX)maxX=v});
+  L.D.forEach(function(v){if(v>maxD)maxD=v});
+  var W=rootIds.length?PAD*2+(maxX+1)*(BW+GX)-GX:300;
+  var H=rootIds.length?PAD*2+(maxD+1)*(BH+GY)-GY:300;
+  cv.style.width=Math.max(W,300)+'px';cv.style.height=Math.max(H,430)+'px';
+  svg.setAttribute('width',Math.max(W,300));svg.setAttribute('height',Math.max(H,430));
+  nodes.forEach(function(n){n._x=PAD+L.X.get(n.id)*(BW+GX);n._y=PAD+L.D.get(n.id)*(BH+GY)});
+  var NS='http://www.w3.org/2000/svg';
+  nodes.forEach(function(n){n.children.forEach(function(c){var ch=nodes.get(c);
+    var x1=n._x+BW/2,y1=n._y+BH,x2=ch._x+BW/2,y2=ch._y,m=y1+GY/2;
+    var p=document.createElementNS(NS,'path');
+    p.setAttribute('d','M '+x1+' '+y1+' V '+m+' H '+x2+' V '+y2);
+    p.setAttribute('fill','none');p.setAttribute('stroke','#444');p.setAttribute('stroke-width','1.4');
+    svg.appendChild(p)})});
+  nodes.forEach(function(n){var d=document.createElement('div');
+    d.className='node'+(n.id===sel?' sel':'');
+    d.style.left=n._x+'px';d.style.top=n._y+'px';
+    var tt=document.createElement('div');tt.className='tt';tt.textContent=n.t||'';
+    var nm=document.createElement('div');nm.className='nm';nm.textContent=n.name||'(chưa đặt tên)';
+    d.appendChild(tt);d.appendChild(nm);
+    d.title=(n.name||'')+(n.t?' · '+n.t:'');
+    d.onclick=function(e){e.stopPropagation();select(n.id)};
+    d.ondblclick=function(e){e.stopPropagation();select(n.id,true)};
+    cv.appendChild(d)})}
+
+function renderPanel(){var p=$('panel');
+  if(!sel||!nodes.has(sel)){
+    p.innerHTML='<h2>Chi tiết</h2><div class="hint">Chọn một box để sửa.<br><br>Bắt đầu: bấm “＋ Box gốc”, đặt tên, chọn cấp T, rồi dùng “＋ Cấp dưới” để mở rank tiếp theo.</div>';return}
+  var n=nodes.get(sel);
+  p.innerHTML='<h2>Chi tiết box</h2>'
+   +'<label>Tên chức danh / đơn vị</label><input id="fName" autocomplete="off">'
+   +'<label>Cấp T</label><select id="fT"><option value="">—</option>'
+   +['T1','T2','T3','T4','T5','T6','T7','T8'].map(function(t){return '<option>'+t+'</option>'}).join('')
+   +'</select>'
+   +'<div class="row"><button id="bChild" class="primary">＋ Cấp dưới</button><button id="bSib">＋ Ngang hàng</button></div>'
+   +'<div class="row"><button id="bL">◀</button><button id="bR">▶</button><button id="bDel" class="danger">Xóa</button></div>'
+   +'<div class="hint" style="margin-top:10px">◀ ▶ đổi thứ tự với box ngang hàng.</div>';
+  var f=$('fName');f.value=n.name;
+  f.oninput=function(){n.name=f.value;renderCanvas();renderTable()};
+  var s=$('fT');s.value=n.t||'';
+  s.onchange=function(){n.t=s.value;renderCanvas();renderTable()};
+  $('bChild').onclick=function(){addChild(sel)};
+  $('bSib').onclick=function(){addSib(sel)};
+  $('bL').onclick=function(){moveSib(sel,-1)};
+  $('bR').onclick=function(){moveSib(sel,1)};
+  $('bDel').onclick=function(){delNode(sel)}}
+
+function paths(){var out=[];
+  function dfs(id,acc){var n=nodes.get(id);var a=acc.concat([n]);
+    if(!n.children.length){out.push(a);return}
+    n.children.forEach(function(c){dfs(c,a)})}
+  rootIds.forEach(function(r){dfs(r,[])});return out}
+
+function renderTable(){var host=$('tblHost');host.innerHTML='';
+  if(!rootIds.length){host.innerHTML='<div class="hint">Bảng sẽ tự cập nhật khi bạn vẽ. Mỗi nhánh (đường từ gốc xuống box cuối) là một dòng; mỗi cấp là một cột.</div>';return}
+  var rows=paths(),depth=0;
+  rows.forEach(function(r){if(r.length>depth)depth=r.length});
+  var showT=$('ckT').checked;
+  var tb=document.createElement('table'),tr=document.createElement('tr');
+  for(var i=1;i<=depth;i++){var th=document.createElement('th');th.textContent='Cấp '+i;tr.appendChild(th)}
+  tb.appendChild(tr);
+  rows.forEach(function(r){var trr=document.createElement('tr');
+    for(var i=0;i<depth;i++){var td=document.createElement('td');
+      var n=r[i];td.textContent=n?(n.name+(showT&&n.t?' ('+n.t+')':'')):'';
+      trr.appendChild(td)}
+    tb.appendChild(trr)});
+  host.appendChild(tb)}
+
+function renderAll(){renderCanvas();renderPanel();renderTable()}
+
+/* ---------- xuất / lưu ---------- */
+function tsv(){var rows=paths(),depth=0;
+  rows.forEach(function(r){if(r.length>depth)depth=r.length});
+  var showT=$('ckT').checked,lines=[],hdr=[];
+  for(var i=1;i<=depth;i++)hdr.push('Cấp '+i);
+  lines.push(hdr.join('\t'));
+  rows.forEach(function(r){var cs=[];
+    for(var i=0;i<depth;i++){var n=r[i];cs.push(n?(n.name+(showT&&n.t?' ('+n.t+')':'')):'')}
+    lines.push(cs.join('\t'))});
+  return lines.join('\n')}
+function copyTable(){if(!rootIds.length){msg('Chưa có gì để copy');return}
+  var t=tsv();
+  function ok(){msg('Đã copy — dán thẳng vào Excel')}
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,function(){fb()})}else fb();
+  function fb(){var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');ok()}catch(e){msg('Trình duyệt chặn copy')}
+    document.body.removeChild(ta)}}
+function dl(blob,name){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href)},500)}
+function ser(id){var n=nodes.get(id);return{name:n.name,t:n.t,children:n.children.map(ser)}}
+function saveJSON(){dl(new Blob([JSON.stringify({v:1,roots:rootIds.map(ser)},null,1)],{type:'application/json'}),'orgchart.json');msg('Đã tải orgchart.json')}
+function loadJSON(file){file.text().then(function(t){var d=JSON.parse(t);
+    nodes=new Map();rootIds=[];seq=1;sel=null;
+    function mk(o,parent){var id=nn(o.name||'',o.t||'',parent);
+      (o.children||[]).forEach(function(c){nodes.get(id).children.push(mk(c,id))});return id}
+    (d.roots||[]).forEach(function(r){rootIds.push(mk(r,null))});
+    renderAll();msg('Đã mở file')
+  }).catch(function(){msg('File JSON không hợp lệ')})}
+function xesc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function exportDrawio(){if(!rootIds.length){msg('Chưa có gì để xuất');return}
+  renderCanvas();
+  var cells='<mxCell id="0"/><mxCell id="1" parent="0"/>';
+  nodes.forEach(function(n){
+    cells+='<object label="'+xesc(n.name)+'" cap_T="'+xesc(n.t||'')+'" id="'+n.id+'">'
+      +'<mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">'
+      +'<mxGeometry x="'+n._x+'" y="'+n._y+'" width="'+BW+'" height="'+BH+'" as="geometry"/></mxCell></object>'});
+  var i=0;
+  nodes.forEach(function(n){n.children.forEach(function(c){
+    cells+='<mxCell id="e'+(++i)+'" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=none;" edge="1" parent="1" source="'+n.id+'" target="'+c+'">'
+      +'<mxGeometry relative="1" as="geometry"/></mxCell>'})});
+  var xml='<mxfile host="app.diagrams.net"><diagram name="Org" id="org1">'
+    +'<mxGraphModel dx="1000" dy="800" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1200"><root>'
+    +cells+'</root></mxGraphModel></diagram></mxfile>';
+  dl(new Blob([xml],{type:'application/xml'}),'orgchart.drawio');msg('Đã tải orgchart.drawio')}
+
+/* ---------- wiring ---------- */
+$('bRoot').onclick=addRoot;
+$('bSave').onclick=saveJSON;
+$('bOpen').onclick=function(){$('fileIn').click()};
+$('fileIn').onchange=function(e){if(e.target.files[0])loadJSON(e.target.files[0]);e.target.value=''};
+$('bCopy').onclick=copyTable;
+$('bDrawio').onclick=exportDrawio;
+$('ckT').onchange=renderTable;
+$('canvasWrap').onclick=function(){sel=null;renderAll()};
+window.onbeforeunload=function(){return nodes.size?true:null};
+renderAll();
+</script>
 </body>
 </html>
