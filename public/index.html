@@ -6,8 +6,9 @@
 <title>Org Builder — sơ đồ &amp; bảng phân cấp</title>
 <style>
   *{box-sizing:border-box}
-  body{margin:0;font:14px/1.45 system-ui,"Segoe UI",Arial,sans-serif;color:#111;background:#fff}
-  header{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px;border-bottom:1px solid #ddd;position:sticky;top:0;background:#fff;z-index:5}
+  html,body{height:100%}
+  body{margin:0;font:14px/1.45 system-ui,"Segoe UI",Arial,sans-serif;color:#111;background:#fff;display:flex;flex-direction:column}
+  header{flex:none;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px;border-bottom:1px solid #ddd;background:#fff}
   header h1{font-size:15px;margin:0 10px 0 0;font-weight:600}
   button{font:inherit;padding:6px 10px;border:1px solid #333;background:#fff;cursor:pointer;border-radius:3px}
   button:hover{background:#f0f0f0}
@@ -15,27 +16,36 @@
   button.primary:hover{background:#333}
   button.danger{color:#a00;border-color:#a00}
   #msg{color:#0a6;font-size:12.5px;margin-left:4px}
-  main{display:flex;min-height:430px}
-  #canvasWrap{flex:1;overflow:auto;background:#fafafa}
-  #canvas{position:relative;min-width:100%;min-height:430px}
+  main{flex:1;min-height:0;display:flex}
+  #canvasWrap{flex:1;overflow:auto;background:#fafafa;cursor:grab;touch-action:none}
+  #canvasWrap.panning{cursor:grabbing}
+  #canvas{position:relative;min-width:100%;min-height:100%}
   #svg{position:absolute;left:0;top:0;pointer-events:none}
   .node{position:absolute;width:170px;height:58px;border:1px solid #333;background:#fff;padding:6px 8px;cursor:pointer;overflow:hidden;border-radius:3px}
-  .node.sel{border-width:2px;background:#ececec}
+  .node.sel{border-width:2.5px;box-shadow:0 1px 5px rgba(0,0,0,.35)}
   .node .nm{font-size:12.5px;line-height:1.25;max-height:32px;overflow:hidden;word-wrap:break-word;margin-top:2px}
-  .node .tt{position:absolute;right:5px;top:3px;font-size:10.5px;color:#777}
-  #panel{width:250px;border-left:1px solid #ddd;padding:12px;flex:none}
+  .node .tt{position:absolute;right:5px;top:3px;font-size:10.5px;color:#333;opacity:.75}
+  #panel{width:250px;flex:none;border-left:1px solid #ddd;padding:12px;overflow:auto}
   #panel h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#555}
   #panel label{display:block;font-size:12px;color:#555;margin:10px 0 3px}
   #panel input,#panel select{width:100%;font:inherit;padding:6px;border:1px solid #bbb;border-radius:3px}
   .row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
   .hint{color:#888;font-size:12.5px}
-  #tableSec{border-top:1px solid #ddd;padding:12px}
-  #tableSec h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#555}
-  .tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:13px}
-  table{border-collapse:collapse;font-size:13px}
-  th,td{border:1px solid #999;padding:4px 9px;text-align:left}
-  th{background:#f2f2f2;font-weight:600}
-  @media(max-width:760px){main{flex-direction:column}#panel{width:auto;border-left:none;border-top:1px solid #ddd}}
+  #tableSec{flex:none;display:flex;flex-direction:column;max-height:40vh;border-top:1px solid #ddd;padding:10px 12px}
+  #tableSec h2{flex:none;font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#555}
+  #tblHost{min-height:0;display:flex}
+  #tblScroll{overflow:auto;border:1px solid #999;max-width:100%;min-height:0}
+  table{border-collapse:separate;border-spacing:0;font-size:13px}
+  th,td{border-right:1px solid #999;border-bottom:1px solid #999;padding:4px 9px;text-align:left;white-space:nowrap}
+  th:last-child,td:last-child{border-right:none}
+  tr:last-child td{border-bottom:none}
+  th{position:sticky;top:0;background:#f2f2f2;font-weight:600;z-index:1}
+  td.dash{color:#999;text-align:center}
+  @media(max-width:760px){
+    main{flex-direction:column}
+    #panel{width:auto;max-height:36vh;border-left:none;border-top:1px solid #ddd}
+    #tableSec{max-height:34vh}
+  }
 </style>
 </head>
 <body>
@@ -56,25 +66,24 @@
 </main>
 
 <section id="tableSec">
-  <h2>Bảng phân cấp (tự cập nhật)</h2>
-  <div class="tools">
-    <label><input type="checkbox" id="ckT"> Hiện cấp T trong bảng</label>
-  </div>
+  <h2>Bảng phân cấp (tự cập nhật — cột thẳng hàng theo cấp T)</h2>
   <div id="tblHost"></div>
 </section>
 
 <script>
 "use strict";
 var BW=170, BH=58, GX=18, GY=70, PAD=20;
+var TCOLOR={T1:'#ea9651',T2:'#92d050',T3:'#f6d5b9',T4:'#77e3f2',T5:'#cfc8dd',T6:'#ffffff',T7:'#ffffff',T8:'#ffffff'};
 var nodes=new Map(), rootIds=[], sel=null, seq=1;
 function $(id){return document.getElementById(id)}
-function msg(t){var m=$('msg');m.textContent=t;clearTimeout(msg._t);msg._t=setTimeout(function(){m.textContent=''},2500)}
+function msg(t){var m=$('msg');m.textContent=t;clearTimeout(msg._t);msg._t=setTimeout(function(){m.textContent=''},3000)}
+function tnum(t){var n=parseInt(String(t||'').slice(1),10);return (n>=1&&n<=8)?n:0}
 
 /* ---------- model ---------- */
 function nn(name,t,parent){var id='n'+(seq++);nodes.set(id,{id:id,name:name,t:t,parent:parent,children:[]});return id}
-function addRoot(){var id=nn('Chức danh mới', rootIds.length? '' : 'T1', null);rootIds.push(id);select(id,true)}
-function addChild(pid){var p=nodes.get(pid);var pt=parseInt((p.t||'').slice(1));
-  var t=isNaN(pt)?'':('T'+Math.min(8,pt+1));
+function addRoot(){var id=nn('Chức danh mới','T1',null);rootIds.push(id);select(id,true)}
+function addChild(pid){var p=nodes.get(pid);
+  var t='T'+Math.min(8,tnum(p.t)+1);
   var id=nn('Chức danh mới',t,pid);p.children.push(id);select(id,true)}
 function addSib(id){var n=nodes.get(id);var nid=nn('Chức danh mới',n.t,n.parent);
   var arr=n.parent?nodes.get(n.parent).children:rootIds;
@@ -88,30 +97,49 @@ function delNode(id){var n=nodes.get(id);
 function moveSib(id,dir){var n=nodes.get(id);var arr=n.parent?nodes.get(n.parent).children:rootIds;
   var i=arr.indexOf(id),j=i+dir;if(j<0||j>=arr.length)return;
   var tmp=arr[i];arr[i]=arr[j];arr[j]=tmp;renderAll()}
+function setT(id,t){var n=nodes.get(id);n.t=t;var fixed=0;
+  (function fix(pid){nodes.get(pid).children.forEach(function(c){
+    var ch=nodes.get(c);
+    if(tnum(ch.t)<tnum(nodes.get(pid).t)){ch.t=nodes.get(pid).t;fixed++}
+    fix(c)})})(id);
+  if(fixed)msg('Đã nâng '+fixed+' box cấp dưới cho khớp cấp T mới');
+  renderAll()}
 function select(id,focus){sel=id;renderAll();
   if(focus){var f=$('fName');if(f){f.focus();f.select()}}}
 
-/* ---------- layout: rank theo độ sâu, con xếp dưới cha ---------- */
-function layout(){var X=new Map(),D=new Map(),next=0;
-  function walk(id,d){D.set(id,d);var n=nodes.get(id);
+/* ---------- layout: hàng = (cấp T, lần xuất hiện thứ k) ---------- */
+function layout(){
+  var codes=new Set();
+  function pass1(id){var n=nodes.get(id);var p=n.parent?nodes.get(n.parent):null;
+    n._tn=tnum(n.t)||1;
+    n._k=(p&&p._tn===n._tn)?p._k+1:1;
+    codes.add(n._tn*1000+n._k);
+    n.children.forEach(pass1)}
+  rootIds.forEach(pass1);
+  var keys=Array.from(codes).sort(function(a,b){return a-b})
+    .map(function(c){return {t:Math.floor(c/1000),k:c%1000,code:c}});
+  var rowOf=new Map();keys.forEach(function(kk,i){rowOf.set(kk.code,i)});
+  var X=new Map(),next=0;
+  function pass2(id){var n=nodes.get(id);
+    n._row=rowOf.get(n._tn*1000+n._k);
     if(!n.children.length){X.set(id,next++);return next-1}
-    var xs=n.children.map(function(c){return walk(c,d+1)});
+    var xs=n.children.map(pass2);
     var x=(xs[0]+xs[xs.length-1])/2;X.set(id,x);return x}
-  rootIds.forEach(function(r,i){if(i)next+=0.5;walk(r,0)});
-  return {X:X,D:D}}
+  rootIds.forEach(function(r,i){if(i)next+=0.5;pass2(r)});
+  return {X:X,keys:keys}}
+function keyLabel(kk){return kk.k===1?('T'+kk.t):('T'+kk.t+' ('+kk.k+')')}
 
 /* ---------- render ---------- */
 function renderCanvas(){var cv=$('canvas'),svg=$('svg');
   cv.querySelectorAll('.node').forEach(function(e){e.remove()});
   while(svg.firstChild)svg.removeChild(svg.firstChild);
-  var L=layout(),maxX=0,maxD=0;
+  var L=layout(),maxX=0;
   L.X.forEach(function(v){if(v>maxX)maxX=v});
-  L.D.forEach(function(v){if(v>maxD)maxD=v});
   var W=rootIds.length?PAD*2+(maxX+1)*(BW+GX)-GX:300;
-  var H=rootIds.length?PAD*2+(maxD+1)*(BH+GY)-GY:300;
-  cv.style.width=Math.max(W,300)+'px';cv.style.height=Math.max(H,430)+'px';
-  svg.setAttribute('width',Math.max(W,300));svg.setAttribute('height',Math.max(H,430));
-  nodes.forEach(function(n){n._x=PAD+L.X.get(n.id)*(BW+GX);n._y=PAD+L.D.get(n.id)*(BH+GY)});
+  var H=rootIds.length?PAD*2+L.keys.length*(BH+GY)-GY:300;
+  cv.style.width=Math.max(W,300)+'px';cv.style.height=Math.max(H,300)+'px';
+  svg.setAttribute('width',Math.max(W,300));svg.setAttribute('height',Math.max(H,300));
+  nodes.forEach(function(n){n._x=PAD+L.X.get(n.id)*(BW+GX);n._y=PAD+n._row*(BH+GY)});
   var NS='http://www.w3.org/2000/svg';
   nodes.forEach(function(n){n.children.forEach(function(c){var ch=nodes.get(c);
     var x1=n._x+BW/2,y1=n._y+BH,x2=ch._x+BW/2,y2=ch._y,m=y1+GY/2;
@@ -122,6 +150,7 @@ function renderCanvas(){var cv=$('canvas'),svg=$('svg');
   nodes.forEach(function(n){var d=document.createElement('div');
     d.className='node'+(n.id===sel?' sel':'');
     d.style.left=n._x+'px';d.style.top=n._y+'px';
+    d.style.background=TCOLOR[n.t]||'#ffffff';
     var tt=document.createElement('div');tt.className='tt';tt.textContent=n.t||'';
     var nm=document.createElement('div');nm.className='nm';nm.textContent=n.name||'(chưa đặt tên)';
     d.appendChild(tt);d.appendChild(nm);
@@ -132,20 +161,20 @@ function renderCanvas(){var cv=$('canvas'),svg=$('svg');
 
 function renderPanel(){var p=$('panel');
   if(!sel||!nodes.has(sel)){
-    p.innerHTML='<h2>Chi tiết</h2><div class="hint">Chọn một box để sửa.<br><br>Bắt đầu: bấm “＋ Box gốc”, đặt tên, chọn cấp T, rồi dùng “＋ Cấp dưới” để mở rank tiếp theo.</div>';return}
+    p.innerHTML='<h2>Chi tiết</h2><div class="hint">Chọn một box để sửa.<br><br>Bắt đầu: bấm “＋ Box gốc”, đặt tên, chọn cấp T, rồi “＋ Cấp dưới” để mở rank tiếp theo.<br><br>Kéo chuột trên nền để di chuyển vùng nhìn.<br><br>Cấp T của box con tối thiểu bằng cấp T của box cha.</div>';return}
   var n=nodes.get(sel);
+  var minT=n.parent?tnum(nodes.get(n.parent).t):1;
+  var opts='';for(var i=minT;i<=8;i++)opts+='<option>T'+i+'</option>';
   p.innerHTML='<h2>Chi tiết box</h2>'
    +'<label>Tên chức danh / đơn vị</label><input id="fName" autocomplete="off">'
-   +'<label>Cấp T</label><select id="fT"><option value="">—</option>'
-   +['T1','T2','T3','T4','T5','T6','T7','T8'].map(function(t){return '<option>'+t+'</option>'}).join('')
-   +'</select>'
+   +'<label>Cấp T'+(minT>1?' (tối thiểu T'+minT+' theo cấp cha)':'')+'</label><select id="fT">'+opts+'</select>'
    +'<div class="row"><button id="bChild" class="primary">＋ Cấp dưới</button><button id="bSib">＋ Ngang hàng</button></div>'
    +'<div class="row"><button id="bL">◀</button><button id="bR">▶</button><button id="bDel" class="danger">Xóa</button></div>'
    +'<div class="hint" style="margin-top:10px">◀ ▶ đổi thứ tự với box ngang hàng.</div>';
   var f=$('fName');f.value=n.name;
   f.oninput=function(){n.name=f.value;renderCanvas();renderTable()};
-  var s=$('fT');s.value=n.t||'';
-  s.onchange=function(){n.t=s.value;renderCanvas();renderTable()};
+  var s=$('fT');s.value=n.t;
+  s.onchange=function(){setT(n.id,s.value)};
   $('bChild').onclick=function(){addChild(sel)};
   $('bSib').onclick=function(){addSib(sel)};
   $('bL').onclick=function(){moveSib(sel,-1)};
@@ -158,48 +187,59 @@ function paths(){var out=[];
     n.children.forEach(function(c){dfs(c,a)})}
   rootIds.forEach(function(r){dfs(r,[])});return out}
 
+/* bảng và TSV dùng chung một lưới: cột = hàng của chart */
+function buildGrid(){var L=layout();
+  var header=L.keys.map(keyLabel);
+  var rows=paths().map(function(pth){
+    var cells=new Array(L.keys.length).fill('');
+    var first=pth[0]._row,last=pth[pth.length-1]._row;
+    for(var c=first;c<=last;c++)cells[c]='—';
+    pth.forEach(function(n){cells[n._row]=n.name||'(chưa đặt tên)'});
+    return cells});
+  return {header:header,rows:rows}}
+
 function renderTable(){var host=$('tblHost');host.innerHTML='';
-  if(!rootIds.length){host.innerHTML='<div class="hint">Bảng sẽ tự cập nhật khi bạn vẽ. Mỗi nhánh (đường từ gốc xuống box cuối) là một dòng; mỗi cấp là một cột.</div>';return}
-  var rows=paths(),depth=0;
-  rows.forEach(function(r){if(r.length>depth)depth=r.length});
-  var showT=$('ckT').checked;
+  if(!rootIds.length){host.innerHTML='<div class="hint">Bảng sẽ tự cập nhật khi bạn vẽ. Mỗi nhánh là một dòng; mỗi cột là một hàng cấp T trên chart. Ô “—” nghĩa là nhánh đi xuyên qua cấp đó.</div>';return}
+  var g=buildGrid();
+  var sc=document.createElement('div');sc.id='tblScroll';
   var tb=document.createElement('table'),tr=document.createElement('tr');
-  for(var i=1;i<=depth;i++){var th=document.createElement('th');th.textContent='Cấp '+i;tr.appendChild(th)}
+  g.header.forEach(function(h){var th=document.createElement('th');th.textContent=h;tr.appendChild(th)});
   tb.appendChild(tr);
-  rows.forEach(function(r){var trr=document.createElement('tr');
-    for(var i=0;i<depth;i++){var td=document.createElement('td');
-      var n=r[i];td.textContent=n?(n.name+(showT&&n.t?' ('+n.t+')':'')):'';
-      trr.appendChild(td)}
+  g.rows.forEach(function(r){var trr=document.createElement('tr');
+    r.forEach(function(cell){var td=document.createElement('td');
+      td.textContent=cell;if(cell==='—')td.className='dash';
+      trr.appendChild(td)});
     tb.appendChild(trr)});
-  host.appendChild(tb)}
+  sc.appendChild(tb);host.appendChild(sc)}
 
 function renderAll(){renderCanvas();renderPanel();renderTable()}
 
 /* ---------- xuất / lưu ---------- */
-function tsv(){var rows=paths(),depth=0;
-  rows.forEach(function(r){if(r.length>depth)depth=r.length});
-  var showT=$('ckT').checked,lines=[],hdr=[];
-  for(var i=1;i<=depth;i++)hdr.push('Cấp '+i);
-  lines.push(hdr.join('\t'));
-  rows.forEach(function(r){var cs=[];
-    for(var i=0;i<depth;i++){var n=r[i];cs.push(n?(n.name+(showT&&n.t?' ('+n.t+')':'')):'')}
-    lines.push(cs.join('\t'))});
+function tsv(){var g=buildGrid();
+  var lines=[g.header.join('\t')];
+  g.rows.forEach(function(r){lines.push(r.join('\t'))});
   return lines.join('\n')}
 function copyTable(){if(!rootIds.length){msg('Chưa có gì để copy');return}
   var t=tsv();
   function ok(){msg('Đã copy — dán thẳng vào Excel')}
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,function(){fb()})}else fb();
   function fb(){var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();
     try{document.execCommand('copy');ok()}catch(e){msg('Trình duyệt chặn copy')}
-    document.body.removeChild(ta)}}
+    document.body.removeChild(ta)}
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb)}else fb()}
 function dl(blob,name){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href)},500)}
 function ser(id){var n=nodes.get(id);return{name:n.name,t:n.t,children:n.children.map(ser)}}
-function saveJSON(){dl(new Blob([JSON.stringify({v:1,roots:rootIds.map(ser)},null,1)],{type:'application/json'}),'orgchart.json');msg('Đã tải orgchart.json')}
-function loadJSON(file){file.text().then(function(t){var d=JSON.parse(t);
+function saveJSON(){dl(new Blob([JSON.stringify({v:2,roots:rootIds.map(ser)},null,1)],{type:'application/json'}),'orgchart.json');msg('Đã tải orgchart.json')}
+function loadJSON(file){file.text().then(function(txt){var d=JSON.parse(txt);
     nodes=new Map();rootIds=[];seq=1;sel=null;
-    function mk(o,parent){var id=nn(o.name||'',o.t||'',parent);
-      (o.children||[]).forEach(function(c){nodes.get(id).children.push(mk(c,id))});return id}
+    function mk(o,parentId){
+      var pt=parentId?tnum(nodes.get(parentId).t):1;
+      var tn=tnum(o.t);
+      if(!tn)tn=parentId?Math.min(8,pt+1):1;   // file cũ có T trống
+      if(tn<pt)tn=pt;                           // vi phạm ràng buộc -> kẹp về T cha
+      var id=nn(o.name||'','T'+tn,parentId);
+      (o.children||[]).forEach(function(c){nodes.get(id).children.push(mk(c,id))});
+      return id}
     (d.roots||[]).forEach(function(r){rootIds.push(mk(r,null))});
     renderAll();msg('Đã mở file')
   }).catch(function(){msg('File JSON không hợp lệ')})}
@@ -208,8 +248,9 @@ function exportDrawio(){if(!rootIds.length){msg('Chưa có gì để xuất');re
   renderCanvas();
   var cells='<mxCell id="0"/><mxCell id="1" parent="0"/>';
   nodes.forEach(function(n){
+    var fill=TCOLOR[n.t]||'#FFFFFF';
     cells+='<object label="'+xesc(n.name)+'" cap_T="'+xesc(n.t||'')+'" id="'+n.id+'">'
-      +'<mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;" vertex="1" parent="1">'
+      +'<mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor='+fill+';strokeColor=#000000;" vertex="1" parent="1">'
       +'<mxGeometry x="'+n._x+'" y="'+n._y+'" width="'+BW+'" height="'+BH+'" as="geometry"/></mxCell></object>'});
   var i=0;
   nodes.forEach(function(n){n.children.forEach(function(c){
@@ -220,6 +261,31 @@ function exportDrawio(){if(!rootIds.length){msg('Chưa có gì để xuất');re
     +cells+'</root></mxGraphModel></diagram></mxfile>';
   dl(new Blob([xml],{type:'application/xml'}),'orgchart.drawio');msg('Đã tải orgchart.drawio')}
 
+/* ---------- kéo nền để di chuyển vùng nhìn ---------- */
+(function(){var cw=$('canvasWrap');
+  var active=false,moved=false,px=0,py=0,sx=0,sy=0,pid=null;
+  cw.addEventListener('pointerdown',function(e){
+    if(e.button!==undefined&&e.button!==0)return;
+    if(e.target.closest('.node'))return;
+    active=true;moved=false;pid=e.pointerId;
+    px=e.clientX;py=e.clientY;sx=cw.scrollLeft;sy=cw.scrollTop;
+    if(cw.setPointerCapture&&pid!=null){try{cw.setPointerCapture(pid)}catch(_){/**/}}});
+  cw.addEventListener('pointermove',function(e){
+    if(!active)return;
+    var dx=e.clientX-px,dy=e.clientY-py;
+    if(!moved&&(Math.abs(dx)>5||Math.abs(dy)>5)){moved=true;cw.classList.add('panning')}
+    if(moved){cw.scrollLeft=sx-dx;cw.scrollTop=sy-dy}});
+  function up(){if(!active)return;active=false;cw.classList.remove('panning');
+    if(cw.releasePointerCapture&&pid!=null){try{cw.releasePointerCapture(pid)}catch(_){/**/}}
+    pid=null}
+  cw.addEventListener('pointerup',up);
+  cw.addEventListener('pointercancel',up);
+  cw.addEventListener('click',function(e){
+    if(moved){moved=false;e.stopPropagation();e.preventDefault();return}
+    if(!e.target.closest('.node')){sel=null;renderAll()}
+  },true);
+})();
+
 /* ---------- wiring ---------- */
 $('bRoot').onclick=addRoot;
 $('bSave').onclick=saveJSON;
@@ -227,8 +293,6 @@ $('bOpen').onclick=function(){$('fileIn').click()};
 $('fileIn').onchange=function(e){if(e.target.files[0])loadJSON(e.target.files[0]);e.target.value=''};
 $('bCopy').onclick=copyTable;
 $('bDrawio').onclick=exportDrawio;
-$('ckT').onchange=renderTable;
-$('canvasWrap').onclick=function(){sel=null;renderAll()};
 window.onbeforeunload=function(){return nodes.size?true:null};
 renderAll();
 </script>
