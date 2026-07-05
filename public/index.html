@@ -17,7 +17,11 @@
 
   header{flex:none;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
          padding:8px 12px;border-bottom:1px solid #ddd;background:#fff}
-  header h1{font-size:15px;margin:0 6px 0 0;font-weight:600}
+  header h1{font-size:15px;margin:0;font-weight:600;line-height:1.15}
+  #brand{display:flex;flex-direction:column;margin-right:6px}
+  #ver{font-size:11px;color:#999;font-weight:400;line-height:1.15}
+  #credit{margin-left:auto;text-align:right;font-size:11px;color:#999;line-height:1.4;white-space:nowrap}
+  #credit b{font-weight:600;color:#777}
   button{font:inherit;padding:6px 10px;border:1px solid #333;background:#fff;cursor:pointer;border-radius:3px}
   button:hover{background:#f0f0f0}
   button.primary{background:#111;color:#fff;border-color:#111}
@@ -26,6 +30,15 @@
   button.tabbtn{border-color:#999;color:#555}
   button.tabbtn.active{background:#111;color:#fff;border-color:#111}
   button.tgl{padding:1px 7px;font-size:12px;border-color:#999}   /* nút thu/mở section */
+  button.ghost{border-color:#bbb;color:#555}                     /* nút phụ (đổi trạng thái xem) */
+  button.ghost:hover{background:#f5f5f5}
+  /* Nhóm nút theo chức năng: mỗi nhóm cách nhau bằng vách mảnh; tab là segmented control */
+  .grp{display:flex;align-items:center;gap:6px}
+  .grp+.grp{padding-left:10px;border-left:1px solid #e3e3e3}
+  .seg{gap:0}
+  .seg button{border-radius:0;margin-left:-1px}
+  .seg button:first-child{margin-left:0;border-radius:3px 0 0 3px}
+  .seg button:last-child{border-radius:0 3px 3px 0}
   #msg{color:#0a6;font-size:12.5px;margin-left:4px}
 
   /* ---- Tab Sơ đồ ---- */
@@ -98,18 +111,19 @@
   .finBox input{width:100%;font:inherit;font-style:italic;font-size:12px;padding:4px 6px;margin-top:3px;
                 border:1px solid #bbb;border-radius:3px}
   .finLink{width:2px;height:14px;background:#444;margin:0 auto}
-  #grpSec{flex:1;min-width:320px}
-  #fcSec{flex:1 1 100%}
+  #grpSec{flex:1 1 380px;min-width:320px}
+  #fcSec{flex:1.3 1 480px;min-width:420px}
   .miniRow{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
   .miniRow input,.miniRow select{font:inherit;font-size:13px;padding:4px 6px;border:1px solid #bbb;border-radius:3px}
   .miniRow input.w2{flex:1;min-width:140px}
   .miniRow select{max-width:290px}
   .miniRow button{padding:2px 8px;font-size:12px}
   .gcnt{font-size:12px;color:#777}
-  /* Bảng FC: input trần trong ô, lọc nhanh, cuộn riêng */
-  .fcScroll{max-height:38vh}
-  #fcTbl input,#fcTbl select{width:100%;font:inherit;font-size:13px;padding:3px 5px;border:1px solid #ccc;border-radius:3px}
-  #fcTbl td{white-space:normal}
+  /* Bảng Nhóm FC + FC: input trần trong ô, lọc nhanh, cuộn riêng ~1/2 view, hàng đầu freeze (th sticky) */
+  .inScroll{max-height:48vh}
+  .resScroll{max-height:60vh}   /* bảng luồng duyệt: cuộn trong khung riêng để header luôn trong tầm nhìn */
+  #fcTbl input,#fcTbl select,#grpTbl input,#grpTbl select{width:100%;font:inherit;font-size:13px;padding:3px 5px;border:1px solid #ccc;border-radius:3px}
+  #fcTbl td,#grpTbl td{white-space:normal}
   #pasteBox{display:none;margin-top:8px}
   #pasteBox textarea{width:100%;height:110px;font:12.5px/1.4 Consolas,monospace;border:1px solid #bbb;border-radius:3px;padding:6px}
   .fdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;border:1px solid rgba(0,0,0,.25)}
@@ -119,6 +133,7 @@
     #panel{width:auto;max-height:36vh;border-left:none;border-top:1px solid #ddd}
     #tableSec{max-height:26vh}
     #finSec{width:100%}
+    #grpSec,#fcSec{min-width:0;flex:1 1 100%}
   }
 </style>
 </head>
@@ -126,24 +141,38 @@
 
 <!-- ================= HEADER CHUNG ================= -->
 <header>
-  <h1>Org Builder</h1>
-  <button id="tabBtnOrg"  class="tabbtn active">Sơ đồ tổ chức</button>
-  <button id="tabBtnFlow" class="tabbtn">Luồng duyệt</button>
-  <button id="bSave">Lưu JSON</button>
-  <button id="bOpen">Mở JSON</button>
-  <button id="bUndo" title="Ctrl+Z">↶ Hoàn tác</button>
+  <div id="brand">
+    <h1>Org Builder</h1>
+    <div id="ver">version 5</div>
+  </div>
+  <div class="grp seg">
+    <button id="tabBtnOrg"  class="tabbtn active">Sơ đồ tổ chức</button>
+    <button id="tabBtnFlow" class="tabbtn">Luồng duyệt</button>
+  </div>
+  <div class="grp">
+    <button id="bSave">Lưu JSON</button>
+    <button id="bOpen">Mở JSON</button>
+  </div>
+  <div class="grp">
+    <button id="bUndo" class="ghost" title="Ctrl+Z">↶ Hoàn tác</button>
+  </div>
   <input type="file" id="fileIn" accept=".json,application/json" hidden>
   <span id="msg"></span>
+  <div id="credit"><b>project affogato</b><br>made with ❤️ by Trung</div>
 </header>
 
 <!-- ================= TAB 1: SƠ ĐỒ TỔ CHỨC ================= -->
 <div id="tabOrg">
   <div id="orgBar">
-    <button id="bRoot" class="primary">＋ Box gốc</button>
-    <button id="bCopy">Copy bảng</button>
-    <button id="bDrawio">Xuất .drawio</button>
-    <button id="bTglChart">Ẩn sơ đồ</button>
-    <button id="bTglPanel">Ẩn panel</button>
+    <div class="grp"><button id="bRoot" class="primary">＋ Box gốc</button></div>
+    <div class="grp">
+      <button id="bCopy">Copy bảng</button>
+      <button id="bDrawio">Xuất .drawio</button>
+    </div>
+    <div class="grp">
+      <button id="bTglChart" class="ghost">Ẩn sơ đồ</button>
+      <button id="bTglPanel" class="ghost">Ẩn panel</button>
+    </div>
     <span id="focusChip" hidden>Focus: <b id="focusName"></b> <button id="bUnfocus">✕</button></span>
   </div>
 
@@ -160,7 +189,14 @@
 
 <!-- ================= TAB 2: LUỒNG DUYỆT ================= -->
 <div id="tabFlow">
-  <div class="flowTop">
+  <!-- Thanh điều khiển: ẩn/hiện cả 3 khu nhập liệu một lúc -->
+  <div class="miniRow" style="margin:0 0 10px">
+    <button id="bTglInputs" class="ghost">Ẩn khu nhập liệu ▴</button>
+    <span class="hint">Ẩn cả Chuỗi Tài chính / Nhóm / Fund Center để chỉ xem bảng luồng duyệt.</span>
+  </div>
+
+  <!-- KHU NHẬP LIỆU: 3 khối input nằm cùng một hàng ngang -->
+  <div class="flowTop" id="flowInputs">
     <!-- Chuỗi Tài chính: 3 box CỐ ĐỊNH, chỉ điền tên. Dữ liệu chỉ nằm trong file JSON. -->
     <section id="finSec" class="flowCard">
       <div class="cardH">Chuỗi Tài chính (cố định) <button id="tglFin" class="tgl">▴</button></div>
@@ -177,41 +213,50 @@
       </div>
     </section>
 
-    <!-- Nhóm Fund Center -->
+    <!-- Nhóm Fund Center: bảng Mã FCG / Tên / CBQLNS + lọc nhanh (cùng ngôn ngữ với bảng FC) -->
     <section id="grpSec" class="flowCard">
-      <div class="cardH">Nhóm Fund Center <button id="tglGrp" class="tgl">▴</button></div>
+      <div class="cardH">Nhóm Fund Center <span id="grpCount" class="gcnt"></span> <button id="tglGrp" class="tgl">▴</button></div>
       <div id="grpBody">
-        <div class="hint">Mỗi nhóm gán 1 CBQLNS (box có ★ bên tab Sơ đồ). Luồng duyệt tính theo nhóm.</div>
-        <div id="grpList"></div>
-        <div class="miniRow"><button id="bAddGrp">＋ Nhóm</button></div>
+        <div class="miniRow">
+          <input id="grpFilter" class="w2" placeholder="Lọc nhanh theo mã / tên nhóm…" autocomplete="off">
+          <button id="bAddGrp">＋ Nhóm</button>
+        </div>
+        <div class="scrollTbl inScroll" style="margin-top:8px">
+          <table id="grpTbl">
+            <colgroup><col style="width:100px"><col style="width:200px"><col style="width:220px"><col style="width:62px"><col style="width:46px"></colgroup>
+            <thead><tr><th>Mã FCG</th><th>Tên nhóm</th><th>CBQLNS (★)</th><th>FC</th><th></th></tr></thead>
+            <tbody id="grpTbody"></tbody>
+          </table>
+        </div>
+        <div class="hint" style="margin-top:6px">Mỗi nhóm gán 1 CBQLNS (box có ★ bên tab Sơ đồ). Luồng duyệt tính theo nhóm.</div>
+      </div>
+    </section>
+
+    <!-- Fund Center: bảng 3 cột + lọc + dán từ Excel -->
+    <section id="fcSec" class="flowCard">
+      <div class="cardH">Fund Center <span id="fcCount" class="gcnt"></span> <button id="tglFc" class="tgl">▴</button></div>
+      <div id="fcBody">
+        <div class="miniRow">
+          <input id="fcFilter" class="w2" placeholder="Lọc nhanh theo mã / tên / nhóm…" autocomplete="off">
+          <button id="bAddFc">＋ Fund Center</button>
+          <button id="bPaste">Dán từ Excel</button>
+        </div>
+        <div id="pasteBox">
+          <div class="hint">Dán 3 cột từ Excel: <b>Mã FC ⇥ Tên ⇥ Tên nhóm</b> (cột nhóm được phép trống;
+          nhóm chưa tồn tại sẽ được tạo và khớp theo tên, không phân biệt hoa thường).</div>
+          <textarea id="pasteTa" placeholder="ID00T00101&#9;Depot 1 - Kapuk&#9;VH Vùng 1&#10;ID00T00201&#9;Depot 2 - Limo&#9;VH Vùng 1"></textarea>
+          <div class="miniRow"><button id="bPasteGo" class="primary">Nhập</button><button id="bPasteCancel">Hủy</button></div>
+        </div>
+        <div class="scrollTbl inScroll" style="margin-top:8px">
+          <table id="fcTbl">
+            <colgroup><col style="width:150px"><col style="width:280px"><col style="width:230px"><col style="width:46px"></colgroup>
+            <thead><tr><th>Mã</th><th>Tên Fund Center</th><th>Nhóm</th><th></th></tr></thead>
+            <tbody id="fcTbody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
   </div>
-
-  <!-- Fund Center: bảng 3 cột + lọc + dán từ Excel -->
-  <section id="fcSec" class="flowCard" style="margin-bottom:14px">
-    <div class="cardH">Fund Center <span id="fcCount" class="gcnt"></span> <button id="tglFc" class="tgl">▴</button></div>
-    <div id="fcBody">
-      <div class="miniRow">
-        <input id="fcFilter" class="w2" placeholder="Lọc nhanh theo mã / tên / nhóm…" autocomplete="off">
-        <button id="bAddFc">＋ Fund Center</button>
-        <button id="bPaste">Dán từ Excel</button>
-      </div>
-      <div id="pasteBox">
-        <div class="hint">Dán 3 cột từ Excel: <b>Mã FC ⇥ Tên ⇥ Tên nhóm</b> (cột nhóm được phép trống;
-        nhóm chưa tồn tại sẽ được tạo và khớp theo tên, không phân biệt hoa thường).</div>
-        <textarea id="pasteTa" placeholder="ID00T00101&#9;Depot 1 - Kapuk&#9;VH Vùng 1&#10;ID00T00201&#9;Depot 2 - Limo&#9;VH Vùng 1"></textarea>
-        <div class="miniRow"><button id="bPasteGo" class="primary">Nhập</button><button id="bPasteCancel">Hủy</button></div>
-      </div>
-      <div class="scrollTbl fcScroll" style="margin-top:8px">
-        <table id="fcTbl">
-          <colgroup><col style="width:150px"><col style="width:280px"><col style="width:230px"><col style="width:46px"></colgroup>
-          <thead><tr><th>Mã</th><th>Tên Fund Center</th><th>Nhóm</th><th></th></tr></thead>
-          <tbody id="fcTbody"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
 
   <!-- Kết quả -->
   <section class="flowCard">
@@ -293,16 +338,33 @@ var fcs      = [];          // [{id, code, name, groupId}]
 var FLOW_DEFAULT = {
   order : ['NNS','Tím','Đỏ','Vàng','Xanh'],
   cols  : ['TĐ1','TĐ2','TĐ3','TĐ4','TĐ*','PD'],
-  colors: {'Xanh':'#92d050','Vàng':'#ffd54a','Đỏ':'#e05a4e','Tím':'#9b7bd4','NNS':'#8a8a8a'},
+  colors: {'Xanh':'#92d050','Vàng':'#ffd54a','Đỏ':'#e05a4e','Tím':'#9b7bd4','NNS':'#5b9bd5'},
   steps : {
     'Xanh': {'PD':'CBQLNS'},
     'Vàng': {'TĐ1':'CBQLNS','TĐ2':'FIN_TPTC','PD':'CAP_TREN_CBQLNS'},
-    'Đỏ'  : {'TĐ1':'CBQLNS','TĐ2':'FIN_TPTC','TĐ3':'FIN_GDTC','PD':'PENDING'},
-    'Tím' : {'TĐ1':'CBQLNS','TĐ2':'FIN_TPTC','TĐ3':'FIN_GDTC','TĐ4':'FIN_CFO','PD':'PENDING'},
+    'Đỏ'  : {'TĐ1':'CBQLNS','TĐ3':'FIN_GDTC','PD':'PENDING'},                  // TĐ2 bỏ trống — chờ logic khác
+    'Tím' : {'TĐ1':'CBQLNS','TĐ4':'FIN_CFO','PD':'PENDING'},                   // TĐ2, TĐ3 bỏ trống — chờ logic khác
     'NNS' : {'TĐ1':'CBQLNS','PD':'FIN_CFO'}
   }
 };
 var flowRules = JSON.parse(JSON.stringify(FLOW_DEFAULT));
+
+// File lưu từ bản trước mang theo luật mặc định CŨ — chỉ nâng cấp khi user chưa tự sửa luật đó
+var OLD_DEFAULTS = {
+  nnsColor: '#8a8a8a',
+  steps: {
+    'Đỏ' : {'TĐ1':'CBQLNS','TĐ2':'FIN_TPTC','TĐ3':'FIN_GDTC','PD':'PENDING'},
+    'Tím': {'TĐ1':'CBQLNS','TĐ2':'FIN_TPTC','TĐ3':'FIN_GDTC','TĐ4':'FIN_CFO','PD':'PENDING'}
+  }
+};
+function migrateRules(r){
+  if (r.colors && r.colors['NNS'] === OLD_DEFAULTS.nnsColor)
+    r.colors['NNS'] = FLOW_DEFAULT.colors['NNS'];
+  if (r.steps) ['Đỏ','Tím'].forEach(function(f){
+    if (JSON.stringify(r.steps[f]) === JSON.stringify(OLD_DEFAULTS.steps[f]))
+      r.steps[f] = JSON.parse(JSON.stringify(FLOW_DEFAULT.steps[f]));
+  });
+}
 
 var undoStack = [], lastSnapKey = null, dirty = false;
 
@@ -425,8 +487,24 @@ function setFocus(id){
   var a = nodes.get(id).parent;
   while (a){ nodes.get(a).collapsed = false; a = nodes.get(a).parent; }
   renderAll();
+  scrollNodeIntoView(id);
 }
-function clearFocus(){ snap(null); focusId = null; renderAll(); }
+function clearFocus(){
+  snap(null);
+  var keep = focusId;             // giữ box vừa bỏ focus trong tầm nhìn (điểm neo định hướng)
+  focusId = null;
+  renderAll();
+  scrollNodeIntoView(keep);
+}
+// Cuộn canvas sao cho box nằm giữa vùng nhìn — layout() thuần nên gọi lại không có side effect
+function scrollNodeIntoView(id){
+  if (!id || !nodes.has(id)) return;
+  var L = layout();
+  if (!L.vis.has(id)) return;
+  var p = L.pos.get(id), cw = $('canvasWrap');
+  cw.scrollLeft = Math.max(0, p.x + BW/2 - cw.clientWidth/2);
+  cw.scrollTop  = Math.max(0, p.y + BH/2 - cw.clientHeight/2);
+}
 function select(id, focusInput){
   sel = id; renderAll();
   if (focusInput){ var f = $('fD'); if (f) f.focus(); }
@@ -787,6 +865,7 @@ function applyState(d){
     var okId = (typeof g.id === 'string' && /^g\d+$/.test(g.id));
     if (okId){ var v = parseInt(g.id.slice(1), 10); if (v > maxG) maxG = v; }
     tG.push({ id: okId ? g.id : ('g' + (++maxG)),
+              code: String(g.code||''),
               name: String(g.name||''),
               cbqlns: (g.cbqlns && tN.has(g.cbqlns)) ? g.cbqlns : null });
   });
@@ -800,6 +879,7 @@ function applyState(d){
   });
   var tRules = (d.flowRules && typeof d.flowRules === 'object' && d.flowRules.steps)
              ? d.flowRules : JSON.parse(JSON.stringify(FLOW_DEFAULT));
+  migrateRules(tRules);
 
   nodes = tN; rootIds = tRoots; focusId = tFocus;
   finance = tFin; fcGroups = tG; fcs = tF; flowRules = tRules;
@@ -895,29 +975,35 @@ function renderFinance(){
   });
 }
 
-/* ---------- [8b] NHÓM FC — cập nhật đích danh ---------- */
+/* ---------- [8b] NHÓM FC — bảng Mã FCG / Tên / CBQLNS, cập nhật đích danh ---------- */
+function groupLabel(g){ return (g.code ? g.code + ' · ' : '') + (g.name || '(nhóm chưa đặt tên)'); }
 function groupOption(g){
   var o = document.createElement('option');
-  o.value = g.id; o.textContent = g.name || '(nhóm chưa đặt tên)';
+  o.value = g.id; o.textContent = groupLabel(g);
   return o;
 }
-// Sửa tên nhóm -> vá NHÃN option trong mọi select của bảng FC ngay tại chỗ
+// Sửa mã/tên nhóm -> vá NHÃN option trong mọi select của bảng FC ngay tại chỗ
 // (đây là chỗ trước đây bị sót khiến dropdown FC hiện tên cũ)
 function patchGroupOptionLabels(g){
   document.querySelectorAll('#fcTbody select option[value="' + g.id + '"]').forEach(function(o){
-    o.textContent = g.name || '(nhóm chưa đặt tên)';
+    o.textContent = groupLabel(g);
   });
 }
+// Một nhóm = một hàng bảng — cùng ngôn ngữ thiết kế với bảng Fund Center
 function groupRow(g){
-  var row = document.createElement('div'); row.className = 'miniRow'; row.dataset.gid = g.id;
-  var inp = document.createElement('input'); inp.className = 'w2';
-  inp.placeholder = 'Tên nhóm'; inp.value = g.name;
-  inp.oninput = function(){
-    snap('g:' + g.id);
-    g.name = inp.value;
-    patchGroupOptionLabels(g);          // dropdown FC cập nhật tức thì
-    refreshFlowResultSoon();
-  };
+  var tr = document.createElement('tr'); tr.dataset.gid = g.id;
+
+  var td0 = document.createElement('td');
+  var code = document.createElement('input'); code.placeholder = 'FCG…'; code.value = g.code || '';
+  code.oninput = function(){ snap('g:' + g.id + ':code'); g.code = code.value; patchGroupOptionLabels(g); refreshFlowResultSoon(); };
+  td0.appendChild(code);
+
+  var td1 = document.createElement('td');
+  var inp = document.createElement('input'); inp.placeholder = 'Tên nhóm'; inp.value = g.name;
+  inp.oninput = function(){ snap('g:' + g.id + ':name'); g.name = inp.value; patchGroupOptionLabels(g); refreshFlowResultSoon(); };
+  td1.appendChild(inp);
+
+  var td2 = document.createElement('td');
   var selE = document.createElement('select');
   var o0 = document.createElement('option'); o0.value=''; o0.textContent='(chưa gán CBQLNS)';
   selE.appendChild(o0);
@@ -931,25 +1017,36 @@ function groupRow(g){
   });
   selE.value = g.cbqlns || '';
   selE.onchange = function(){ snap(null); g.cbqlns = selE.value || null; renderFlowResult(); };
+  td2.appendChild(selE);
 
+  var td3 = document.createElement('td');
   var cnt = document.createElement('span'); cnt.className='gcnt'; cnt.id = 'gcnt_' + g.id;
+  td3.appendChild(cnt);
+
+  var td4 = document.createElement('td');
   var del = document.createElement('button'); del.className='danger'; del.textContent='✕';
   del.title = 'Xóa nhóm';
-  del.onclick = function(){ delGroup(g, row); };
-  row.appendChild(inp); row.appendChild(selE); row.appendChild(cnt); row.appendChild(del);
-  return row;
+  del.onclick = function(){ delGroup(g, tr); };
+  td4.appendChild(del);
+
+  tr.appendChild(td0); tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+  return tr;
 }
 function renderGroups(){
-  var gl = $('grpList'); gl.innerHTML = '';
-  if (!fcGroups.length){ gl.innerHTML = '<div class="hint" id="grpEmpty">Chưa có nhóm nào.</div>'; return; }
-  fcGroups.forEach(function(g){ gl.appendChild(groupRow(g)); });
+  var tb = $('grpTbody'); tb.innerHTML = '';
+  if (!fcGroups.length){
+    tb.innerHTML = '<tr id="grpEmpty"><td colspan="5" class="dash">Chưa có nhóm nào — bấm “＋ Nhóm” hoặc Dán từ Excel.</td></tr>';
+    return;
+  }
+  fcGroups.forEach(function(g){ tb.appendChild(groupRow(g)); });
+  applyGrpFilter();
 }
 function addGroup(){
   snap(null);
-  var g = { id:'g' + (gseq++), name:'', cbqlns:null };
+  var g = { id:'g' + (gseq++), code:'', name:'', cbqlns:null };
   fcGroups.push(g);
   var empty = $('grpEmpty'); if (empty) empty.remove();
-  $('grpList').appendChild(groupRow(g));                       // append 1 dòng, không đập cả list
+  $('grpTbody').appendChild(groupRow(g));                      // append 1 hàng, không đập cả bảng
   document.querySelectorAll('#fcTbody select').forEach(function(s){  // mọi dropdown FC nhận option mới NGAY
     s.appendChild(groupOption(g));
   });
@@ -969,13 +1066,23 @@ function delGroup(g, rowEl){
   updateGroupCounts();
   renderFlowResult();
 }
+function applyGrpFilter(){
+  var qy = ($('grpFilter').value || '').toLowerCase();
+  document.querySelectorAll('#grpTbody tr[data-gid]').forEach(function(tr){
+    var g = fcGroups.find(function(x){ return x.id === tr.dataset.gid; });
+    if (!g) return;
+    var hay = ((g.code || '') + ' ' + (g.name || '')).toLowerCase();
+    tr.style.display = (!qy || hay.indexOf(qy) >= 0) ? '' : 'none';
+  });
+}
 function updateGroupCounts(){
   var cnt = {};
   fcs.forEach(function(f){ if (f.groupId) cnt[f.groupId] = (cnt[f.groupId]||0) + 1; });
   fcGroups.forEach(function(g){
     var s = $('gcnt_' + g.id);
-    if (s) s.textContent = '(' + (cnt[g.id]||0) + ' FC)';
+    if (s) s.textContent = (cnt[g.id]||0) + ' FC';
   });
+  $('grpCount').textContent = '(' + fcGroups.length + ')';
   $('fcCount').textContent = '(' + fcs.length + ')';
 }
 
@@ -1051,7 +1158,7 @@ function importPaste(txt){
     if (gn){
       var key = gn.toLowerCase();
       var g = byName[key];
-      if (!g){ g = { id:'g'+(gseq++), name:gn, cbqlns:null }; fcGroups.push(g); byName[key] = g; nG++; }
+      if (!g){ g = { id:'g'+(gseq++), code:'', name:gn, cbqlns:null }; fcGroups.push(g); byName[key] = g; nG++; }
       gid = g.id;
     }
     fcs.push({ id:'f'+(fseq++), code:code, name:name, groupId:gid });
@@ -1072,7 +1179,7 @@ function flowBlocks(){
       var cb = (g.cbqlns && nodes.has(g.cbqlns)) ? nodes.get(g.cbqlns) : null;
       var codes = fcs.filter(function(f){ return f.groupId === g.id; })
                      .map(function(f){ return f.code || '(chưa mã)'; });
-      var head = (g.name || '(nhóm chưa đặt tên)')
+      var head = groupLabel(g)
         + '\nCBQLNS: ' + (cb ? (cb.person || dispName(cb)) : '(chưa gán)')
         + '\nFC: ' + (codes.length ? codes.join(', ') : '(chưa có FC)');
       blocks.push({ head: head, cb: cb });
@@ -1082,7 +1189,7 @@ function flowBlocks(){
       var g  = fcGroups.find(function(x){ return x.id === f.groupId; }) || null;
       var cb = (g && g.cbqlns && nodes.has(g.cbqlns)) ? nodes.get(g.cbqlns) : null;
       var head = (f.code || '(chưa có mã)') + '\n' + (f.name || '')
-        + '\n' + (g ? ('nhóm: ' + (g.name || '(chưa đặt tên)')) : '(chưa gán nhóm)');
+        + '\n' + (g ? ('nhóm: ' + groupLabel(g)) : '(chưa gán nhóm)');
       blocks.push({ head: head, cb: cb });
     });
   }
@@ -1099,7 +1206,7 @@ function renderFlowResult(){
   var colors = flowRules.colors || FLOW_DEFAULT.colors;
   var steps  = flowRules.steps  || FLOW_DEFAULT.steps;
 
-  var sc = document.createElement('div'); sc.className = 'scrollTbl';
+  var sc = document.createElement('div'); sc.className = 'scrollTbl resScroll';   // header freeze khi cuộn
   var tb = document.createElement('table');
   tb.style.tableLayout = 'fixed';
   var cg = document.createElement('colgroup');
@@ -1269,7 +1376,16 @@ $('finTptc').oninput = function(){ snap('fin:tptc'); finance.tptc = this.value; 
 
 $('bAddGrp').onclick = addGroup;
 $('bAddFc').onclick  = addFc;
-$('fcFilter').oninput = applyFcFilter;
+$('fcFilter').oninput  = applyFcFilter;
+$('grpFilter').oninput = applyGrpFilter;
+
+// Ẩn/hiện cả khu nhập liệu (Tài chính / Nhóm / FC) — chỉ còn bảng luồng duyệt
+var inputsHidden = false;
+$('bTglInputs').onclick = function(){
+  inputsHidden = !inputsHidden;
+  $('flowInputs').style.display = inputsHidden ? 'none' : '';
+  this.textContent = inputsHidden ? 'Hiện khu nhập liệu ▸' : 'Ẩn khu nhập liệu ▴';
+};
 $('bPaste').onclick  = function(){
   var pb = $('pasteBox');
   pb.style.display = (pb.style.display === 'none' || !pb.style.display) ? 'block' : 'none';
