@@ -3,297 +3,1295 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Org Builder — sơ đồ &amp; bảng phân cấp</title>
+<title>Org Builder — sơ đồ, bảng phân cấp &amp; luồng duyệt</title>
 <style>
+  /* ============================================================
+     [CSS] Bố cục khóa theo viewport. Mọi section đều thu/mở được:
+       Tab Sơ đồ : ẩn/hiện sơ đồ, ẩn/hiện panel, thu gọn bảng
+       Tab Luồng : 4 card (Tài chính / Nhóm / FC / Kết quả) đều có nút ▴▸
+     ============================================================ */
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{margin:0;font:14px/1.45 system-ui,"Segoe UI",Arial,sans-serif;color:#111;background:#fff;display:flex;flex-direction:column}
-  header{flex:none;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px;border-bottom:1px solid #ddd;background:#fff}
-  header h1{font-size:15px;margin:0 10px 0 0;font-weight:600}
+  body{margin:0;font:14px/1.45 system-ui,"Segoe UI",Arial,sans-serif;color:#111;background:#fff;
+       display:flex;flex-direction:column}
+
+  header{flex:none;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+         padding:8px 12px;border-bottom:1px solid #ddd;background:#fff}
+  header h1{font-size:15px;margin:0 6px 0 0;font-weight:600}
   button{font:inherit;padding:6px 10px;border:1px solid #333;background:#fff;cursor:pointer;border-radius:3px}
   button:hover{background:#f0f0f0}
   button.primary{background:#111;color:#fff;border-color:#111}
   button.primary:hover{background:#333}
   button.danger{color:#a00;border-color:#a00}
+  button.tabbtn{border-color:#999;color:#555}
+  button.tabbtn.active{background:#111;color:#fff;border-color:#111}
+  button.tgl{padding:1px 7px;font-size:12px;border-color:#999}   /* nút thu/mở section */
   #msg{color:#0a6;font-size:12.5px;margin-left:4px}
+
+  /* ---- Tab Sơ đồ ---- */
+  #tabOrg{flex:1;min-height:0;display:flex;flex-direction:column}
+  #orgBar{flex:none;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+          padding:8px 12px;border-bottom:1px solid #eee}
+  #focusChip{font-size:12.5px;color:#555;border:1px dashed #999;border-radius:3px;padding:3px 6px}
+  #focusChip button{padding:0 5px;font-size:12px;border:none}
   main{flex:1;min-height:0;display:flex}
   #canvasWrap{flex:1;overflow:auto;background:#fafafa;cursor:grab;touch-action:none}
   #canvasWrap.panning{cursor:grabbing}
   #canvas{position:relative;min-width:100%;min-height:100%}
   #svg{position:absolute;left:0;top:0;pointer-events:none}
-  .node{position:absolute;width:170px;height:58px;border:1px solid #333;background:#fff;padding:6px 8px;cursor:pointer;overflow:hidden;border-radius:3px}
+
+  .node{position:absolute;width:190px;height:104px;border:1px solid #333;background:#fff;
+        border-radius:3px;cursor:pointer;overflow:hidden;padding:6px 8px;
+        display:flex;flex-direction:column;justify-content:flex-start;gap:2px}
   .node.sel{border-width:2.5px;box-shadow:0 1px 5px rgba(0,0,0,.35)}
-  .node .nm{font-size:12.5px;line-height:1.25;max-height:32px;overflow:hidden;word-wrap:break-word;margin-top:2px}
   .node .tt{position:absolute;right:5px;top:3px;font-size:10.5px;color:#333;opacity:.75}
+  .node .st{position:absolute;right:5px;top:17px;font-size:11px;color:#7a5b00}
+  .node .hid{position:absolute;right:4px;bottom:3px;font-size:10.5px;color:#333;
+             background:#fff;border:1px solid #999;border-radius:3px;padding:0 4px;cursor:pointer}
+  .node .bd{font-weight:700;font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;
+            -webkit-box-orient:vertical;overflow:hidden;word-break:break-word;padding-right:20px}
+  .node .bt{font-weight:700;font-size:12px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node .bp{font-style:italic;font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;
+            -webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+  .node .be{color:#666;font-size:12px}
+
   #panel{width:250px;flex:none;border-left:1px solid #ddd;padding:12px;overflow:auto}
   #panel h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#555}
   #panel label{display:block;font-size:12px;color:#555;margin:10px 0 3px}
   #panel input,#panel select{width:100%;font:inherit;padding:6px;border:1px solid #bbb;border-radius:3px}
+  #panel .ck{display:flex;gap:6px;align-items:center;margin-top:10px;font-size:13px}
+  #panel .ck input{width:auto}
+  #fD{text-transform:uppercase;font-weight:600}
+  #fC{font-weight:600}
+  #fP{font-style:italic}
   .row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
   .hint{color:#888;font-size:12.5px}
-  #tableSec{flex:none;display:flex;flex-direction:column;max-height:40vh;border-top:1px solid #ddd;padding:10px 12px}
-  #tableSec h2{flex:none;font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.04em;color:#555}
+
+  #tableSec{flex:none;display:flex;flex-direction:column;max-height:30vh;border-top:1px solid #ddd;padding:10px 12px}
+  #tableSec.full{flex:1;max-height:none}                 /* khi ẩn sơ đồ: bảng chiếm toàn bộ */
+  #tableSec.full #tblHost{flex:1}
+  #tableSec h2{flex:none;display:flex;align-items:center;gap:10px;font-size:13px;margin:0 0 8px;
+               text-transform:uppercase;letter-spacing:.04em;color:#555}
+  #tableSec h2 button{padding:2px 8px;font-size:12px;text-transform:none;letter-spacing:0}
   #tblHost{min-height:0;display:flex}
-  #tblScroll{overflow:auto;border:1px solid #999;max-width:100%;min-height:0}
+
+  /* Khung bảng dùng chung: cột CỐ ĐỊNH độ rộng (colgroup) + cuộn ngang/dọc */
+  .scrollTbl{overflow:auto;border:1px solid #999;max-width:100%;min-height:0}
   table{border-collapse:separate;border-spacing:0;font-size:13px}
-  th,td{border-right:1px solid #999;border-bottom:1px solid #999;padding:4px 9px;text-align:left;white-space:nowrap}
+  th,td{border-right:1px solid #999;border-bottom:1px solid #999;padding:4px 9px;text-align:left;vertical-align:top}
   th:last-child,td:last-child{border-right:none}
   tr:last-child td{border-bottom:none}
-  th{position:sticky;top:0;background:#f2f2f2;font-weight:600;z-index:1}
+  th{position:sticky;top:0;background:#f2f2f2;font-weight:600;z-index:1;white-space:nowrap;
+     overflow:hidden;text-overflow:ellipsis}
+  td{white-space:pre-line;overflow-wrap:anywhere}        /* giữ \n, tự ngắt trong bề rộng cột */
   td.dash{color:#999;text-align:center}
+
+  /* ---- Tab Luồng duyệt ---- */
+  #tabFlow{flex:1;min-height:0;overflow:auto;padding:12px;display:none}
+  .cardH{display:flex;align-items:center;gap:10px;font-size:13px;margin:0 0 8px;
+         text-transform:uppercase;letter-spacing:.04em;color:#555;font-weight:600}
+  .flowTop{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px}
+  .flowCard{border:1px solid #ddd;border-radius:3px;padding:10px 12px}
+  #finSec{width:260px;flex:none}
+  .finBox{border:1px solid #333;border-radius:3px;padding:6px 8px;background:#eef3fe}
+  .finBox .fbT{font-weight:700;font-size:12px}
+  .finBox input{width:100%;font:inherit;font-style:italic;font-size:12px;padding:4px 6px;margin-top:3px;
+                border:1px solid #bbb;border-radius:3px}
+  .finLink{width:2px;height:14px;background:#444;margin:0 auto}
+  #grpSec{flex:1;min-width:320px}
+  #fcSec{flex:1 1 100%}
+  .miniRow{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
+  .miniRow input,.miniRow select{font:inherit;font-size:13px;padding:4px 6px;border:1px solid #bbb;border-radius:3px}
+  .miniRow input.w2{flex:1;min-width:140px}
+  .miniRow select{max-width:290px}
+  .miniRow button{padding:2px 8px;font-size:12px}
+  .gcnt{font-size:12px;color:#777}
+  /* Bảng FC: input trần trong ô, lọc nhanh, cuộn riêng */
+  .fcScroll{max-height:38vh}
+  #fcTbl input,#fcTbl select{width:100%;font:inherit;font-size:13px;padding:3px 5px;border:1px solid #ccc;border-radius:3px}
+  #fcTbl td{white-space:normal}
+  #pasteBox{display:none;margin-top:8px}
+  #pasteBox textarea{width:100%;height:110px;font:12.5px/1.4 Consolas,monospace;border:1px solid #bbb;border-radius:3px;padding:6px}
+  .fdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;border:1px solid rgba(0,0,0,.25)}
+
   @media(max-width:760px){
     main{flex-direction:column}
     #panel{width:auto;max-height:36vh;border-left:none;border-top:1px solid #ddd}
-    #tableSec{max-height:34vh}
+    #tableSec{max-height:26vh}
+    #finSec{width:100%}
   }
 </style>
 </head>
 <body>
+
+<!-- ================= HEADER CHUNG ================= -->
 <header>
   <h1>Org Builder</h1>
-  <button id="bRoot" class="primary">＋ Box gốc</button>
+  <button id="tabBtnOrg"  class="tabbtn active">Sơ đồ tổ chức</button>
+  <button id="tabBtnFlow" class="tabbtn">Luồng duyệt</button>
   <button id="bSave">Lưu JSON</button>
   <button id="bOpen">Mở JSON</button>
-  <button id="bCopy">Copy bảng</button>
-  <button id="bDrawio">Xuất .drawio</button>
+  <button id="bUndo" title="Ctrl+Z">↶ Hoàn tác</button>
   <input type="file" id="fileIn" accept=".json,application/json" hidden>
   <span id="msg"></span>
 </header>
 
-<main>
-  <div id="canvasWrap"><div id="canvas"><svg id="svg"></svg></div></div>
-  <div id="panel"></div>
-</main>
+<!-- ================= TAB 1: SƠ ĐỒ TỔ CHỨC ================= -->
+<div id="tabOrg">
+  <div id="orgBar">
+    <button id="bRoot" class="primary">＋ Box gốc</button>
+    <button id="bCopy">Copy bảng</button>
+    <button id="bDrawio">Xuất .drawio</button>
+    <button id="bTglChart">Ẩn sơ đồ</button>
+    <button id="bTglPanel">Ẩn panel</button>
+    <span id="focusChip" hidden>Focus: <b id="focusName"></b> <button id="bUnfocus">✕</button></span>
+  </div>
 
-<section id="tableSec">
-  <h2>Bảng phân cấp (tự cập nhật — cột thẳng hàng theo cấp T)</h2>
-  <div id="tblHost"></div>
-</section>
+  <main>
+    <div id="canvasWrap"><div id="canvas"><svg id="svg"></svg></div></div>
+    <div id="panel"></div>
+  </main>
+
+  <section id="tableSec">
+    <h2>Bảng phân cấp (cột thẳng hàng theo cấp) <button id="bTgl">Thu gọn ▾</button></h2>
+    <div id="tblHost"></div>
+  </section>
+</div>
+
+<!-- ================= TAB 2: LUỒNG DUYỆT ================= -->
+<div id="tabFlow">
+  <div class="flowTop">
+    <!-- Chuỗi Tài chính: 3 box CỐ ĐỊNH, chỉ điền tên. Dữ liệu chỉ nằm trong file JSON. -->
+    <section id="finSec" class="flowCard">
+      <div class="cardH">Chuỗi Tài chính (cố định) <button id="tglFin" class="tgl">▴</button></div>
+      <div id="finBody">
+        <div class="finBox"><div class="fbT">CFO</div>
+          <input id="finCfo" placeholder="(để trống nếu chưa có)" autocomplete="off"></div>
+        <div class="finLink"></div>
+        <div class="finBox"><div class="fbT">Giám đốc Tài chính Thị trường</div>
+          <input id="finGdtc" placeholder="(để trống nếu chưa có)" autocomplete="off"></div>
+        <div class="finLink"></div>
+        <div class="finBox"><div class="fbT">Trưởng phòng Tài chính</div>
+          <input id="finTptc" placeholder="(để trống nếu chưa có)" autocomplete="off"></div>
+        <div class="hint" style="margin-top:8px">3 cấp cố định, chỉ điền tên. Dữ liệu chỉ nằm trong file JSON (Lưu/Mở), không lưu trên web.</div>
+      </div>
+    </section>
+
+    <!-- Nhóm Fund Center -->
+    <section id="grpSec" class="flowCard">
+      <div class="cardH">Nhóm Fund Center <button id="tglGrp" class="tgl">▴</button></div>
+      <div id="grpBody">
+        <div class="hint">Mỗi nhóm gán 1 CBQLNS (box có ★ bên tab Sơ đồ). Luồng duyệt tính theo nhóm.</div>
+        <div id="grpList"></div>
+        <div class="miniRow"><button id="bAddGrp">＋ Nhóm</button></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Fund Center: bảng 3 cột + lọc + dán từ Excel -->
+  <section id="fcSec" class="flowCard" style="margin-bottom:14px">
+    <div class="cardH">Fund Center <span id="fcCount" class="gcnt"></span> <button id="tglFc" class="tgl">▴</button></div>
+    <div id="fcBody">
+      <div class="miniRow">
+        <input id="fcFilter" class="w2" placeholder="Lọc nhanh theo mã / tên / nhóm…" autocomplete="off">
+        <button id="bAddFc">＋ Fund Center</button>
+        <button id="bPaste">Dán từ Excel</button>
+      </div>
+      <div id="pasteBox">
+        <div class="hint">Dán 3 cột từ Excel: <b>Mã FC ⇥ Tên ⇥ Tên nhóm</b> (cột nhóm được phép trống;
+        nhóm chưa tồn tại sẽ được tạo và khớp theo tên, không phân biệt hoa thường).</div>
+        <textarea id="pasteTa" placeholder="ID00T00101&#9;Depot 1 - Kapuk&#9;VH Vùng 1&#10;ID00T00201&#9;Depot 2 - Limo&#9;VH Vùng 1"></textarea>
+        <div class="miniRow"><button id="bPasteGo" class="primary">Nhập</button><button id="bPasteCancel">Hủy</button></div>
+      </div>
+      <div class="scrollTbl fcScroll" style="margin-top:8px">
+        <table id="fcTbl">
+          <colgroup><col style="width:150px"><col style="width:280px"><col style="width:230px"><col style="width:46px"></colgroup>
+          <thead><tr><th>Mã</th><th>Tên Fund Center</th><th>Nhóm</th><th></th></tr></thead>
+          <tbody id="fcTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Kết quả -->
+  <section class="flowCard">
+    <div class="cardH">Bảng luồng duyệt
+      <button id="bFlowView">Đang xem: theo nhóm</button>
+      <button id="bCopyFlow">Copy bảng luồng</button>
+      <button id="tglRes" class="tgl">▴</button>
+    </div>
+    <div id="resBody">
+      <div id="flowResult"></div>
+      <div class="hint" style="margin-top:8px">
+        Luật của từng luồng nằm trong khối <b>flowRules</b> của file JSON — tải về sửa rồi Mở lại để đổi luật.
+        Đỏ / Tím / NNS đang chờ bộ định nghĩa cấp Global.
+      </div>
+    </div>
+  </section>
+</div>
 
 <script>
 "use strict";
-var BW=170, BH=58, GX=18, GY=70, PAD=20;
-var TCOLOR={T1:'#ea9651',T2:'#92d050',T3:'#f6d5b9',T4:'#77e3f2',T5:'#cfc8dd',T6:'#ffffff',T7:'#ffffff',T8:'#ffffff'};
-var nodes=new Map(), rootIds=[], sel=null, seq=1;
-function $(id){return document.getElementById(id)}
-function msg(t){var m=$('msg');m.textContent=t;clearTimeout(msg._t);msg._t=setTimeout(function(){m.textContent=''},3000)}
-function tnum(t){var n=parseInt(String(t||'').slice(1),10);return (n>=1&&n<=8)?n:0}
+/* ======================================================================
+   ORG BUILDER v5 — MỤC LỤC
+   [1] Hằng số & tiện ích nhỏ
+   [2] State toàn cục + Undo (Ctrl+Z) + cờ dirty
+   [3] Model: thao tác trên cây
+   [4] Hiển thị/ẩn: visibleSet() = focus ∩ (không nằm dưới box thu gọn)
+   [5] Layout THUẦN: hàng = (cấp, lớp thứ k)
+   [6] Render tab Sơ đồ (bảng có colgroup cố định độ rộng cột)
+   [7] Xuất & Lưu: TSV, JSON (atomic), .drawio
+   [8] Tab Luồng duyệt:
+       [8a] engine luật (token -> người)
+       [8b] Nhóm FC  — render + CẬP NHẬT ĐÍCH DANH (không đập cả tab)
+       [8c] Fund Center — bảng + lọc + dán từ Excel
+       [8d] Bảng kết quả — gộp theo nhóm (mặc định) / bung theo FC + copy TSV
+   [9] Pan + phím tắt + nối sự kiện + các nút thu/mở section
+   ====================================================================== */
 
-/* ---------- model ---------- */
-function nn(name,t,parent){var id='n'+(seq++);nodes.set(id,{id:id,name:name,t:t,parent:parent,children:[]});return id}
-function addRoot(){var id=nn('Chức danh mới','T1',null);rootIds.push(id);select(id,true)}
-function addChild(pid){var p=nodes.get(pid);
-  var t='T'+Math.min(8,tnum(p.t)+1);
-  var id=nn('Chức danh mới',t,pid);p.children.push(id);select(id,true)}
-function addSib(id){var n=nodes.get(id);var nid=nn('Chức danh mới',n.t,n.parent);
-  var arr=n.parent?nodes.get(n.parent).children:rootIds;
-  arr.splice(arr.indexOf(id)+1,0,nid);select(nid,true)}
-function subCount(id){var n=nodes.get(id);var s=1;n.children.forEach(function(c){s+=subCount(c)});return s}
-function wipe(id){var n=nodes.get(id);n.children.forEach(wipe);nodes.delete(id)}
-function delNode(id){var n=nodes.get(id);
-  if(n.children.length && !confirm('Xóa "'+(n.name||'')+'" cùng '+(subCount(id)-1)+' box cấp dưới?'))return;
-  var arr=n.parent?nodes.get(n.parent).children:rootIds;
-  arr.splice(arr.indexOf(id),1);wipe(id);sel=null;renderAll()}
-function moveSib(id,dir){var n=nodes.get(id);var arr=n.parent?nodes.get(n.parent).children:rootIds;
-  var i=arr.indexOf(id),j=i+dir;if(j<0||j>=arr.length)return;
-  var tmp=arr[i];arr[i]=arr[j];arr[j]=tmp;renderAll()}
-function setT(id,t){var n=nodes.get(id);n.t=t;var fixed=0;
-  (function fix(pid){nodes.get(pid).children.forEach(function(c){
-    var ch=nodes.get(c);
-    if(tnum(ch.t)<tnum(nodes.get(pid).t)){ch.t=nodes.get(pid).t;fixed++}
-    fix(c)})})(id);
-  if(fixed)msg('Đã nâng '+fixed+' box cấp dưới cho khớp cấp T mới');
-  renderAll()}
-function select(id,focus){sel=id;renderAll();
-  if(focus){var f=$('fName');if(f){f.focus();f.select()}}}
+/* ============ [1] HẰNG SỐ & TIỆN ÍCH ============ */
+var BW = 190, BH = 104;
+var GX = 18,  GY = 70;
+var PAD = 20;
+var COLW_ORG  = 190;                    // độ rộng cột bảng phân cấp
+var COLW_FLOW = { head:240, flow:90, step:170 };   // độ rộng cột bảng luồng
 
-/* ---------- layout: hàng = (cấp T, lần xuất hiện thứ k) ---------- */
+var LEVELS = ['CC','T1','T2','T3','T4','T5','T6','T7','T8'];
+var TCOLOR = {CC:'#5e8cf9',T1:'#ea9651',T2:'#92d050',T3:'#f6d5b9',
+              T4:'#77e3f2',T5:'#cfc8dd',T6:'#ffffff',T7:'#ffffff',T8:'#ffffff'};
+
+function $(id){ return document.getElementById(id); }
+function rnum(t){ return LEVELS.indexOf(t); }
+function msg(t){
+  var m = $('msg'); m.textContent = t;
+  clearTimeout(msg._t); msg._t = setTimeout(function(){ m.textContent=''; }, 3500);
+}
+function debounce(fn, ms){                       // gõ liền mạch -> chỉ chạy 1 lần sau khi ngừng
+  var t; return function(){ clearTimeout(t); t = setTimeout(fn, ms); };
+}
+function dispName(n){ return n.dept || n.title || n.person || '(chưa nhập)'; }
+function cellText(n){
+  var p = [n.dept, n.title, n.person].filter(Boolean);
+  if (n.star) p.push('★ CBQLNS');
+  return p.length ? p.join('\n') : '(chưa nhập)';
+}
+function roleText(n){
+  return [n.title || n.dept, n.person].filter(Boolean).join('\n') || '(chưa nhập)';
+}
+
+/* ============ [2] STATE + UNDO + DIRTY ============ */
+var nodes    = new Map();
+var rootIds  = [];
+var sel      = null;
+var focusId  = null;
+var seq = 1, gseq = 1, fseq = 1;
+
+var finance  = {cfo:'', gdtc:'', tptc:''};
+var fcGroups = [];          // [{id, name, cbqlns}]
+var fcs      = [];          // [{id, code, name, groupId}]
+
+var FLOW_DEFAULT = {
+  order : ['NNS','Tím','Đỏ','Vàng','Xanh'],
+  cols  : ['TĐ1','TĐ2','TĐ3','TĐ4','TĐ*','PD'],
+  colors: {'Xanh':'#92d050','Vàng':'#ffd54a','Đỏ':'#e05a4e','Tím':'#9b7bd4','NNS':'#8a8a8a'},
+  steps : {
+    'Xanh': {'PD':'CBQLNS'},
+    'Vàng': {'TĐ1':'CBQLNS','TĐ2':'FIN_TPTC','PD':'CAP_TREN_CBQLNS'},
+    'Đỏ'  : {'TĐ1':'CBQLNS','TĐ2':'FIN_TPTC','TĐ3':'FIN_GDTC','PD':'PENDING'},
+    'Tím' : {'TĐ1':'CBQLNS','TĐ2':'FIN_TPTC','TĐ3':'FIN_GDTC','TĐ4':'FIN_CFO','PD':'PENDING'},
+    'NNS' : {'TĐ1':'CBQLNS','PD':'FIN_CFO'}
+  }
+};
+var flowRules = JSON.parse(JSON.stringify(FLOW_DEFAULT));
+
+var undoStack = [], lastSnapKey = null, dirty = false;
+
+function serializeAll(){
+  return { v:5, roots:rootIds.map(ser), finance:finance,
+           fcGroups:fcGroups, fcs:fcs, flowRules:flowRules };
+}
+function snap(key){
+  if (key !== null && key === lastSnapKey) return;
+  undoStack.push(JSON.stringify(serializeAll()));
+  if (undoStack.length > 60) undoStack.shift();
+  lastSnapKey = key;
+  dirty = true;
+}
+function undo(){
+  if (!undoStack.length){ msg('Không còn gì để hoàn tác'); return; }
+  try { applyState(JSON.parse(undoStack.pop())); }
+  catch(e){ msg('Lỗi hoàn tác'); return; }
+  lastSnapKey = null; dirty = true;
+  renderAll(); msg('Đã hoàn tác');
+}
+
+/* ============ [3] MODEL: THAO TÁC TRÊN CÂY ============ */
+function nn(dept, title, person, t, parent, id){
+  var nid = id || ('n' + (seq++));
+  nodes.set(nid, {id:nid, dept:dept, title:title, person:person, t:t,
+                  star:false, collapsed:false, parent:parent, children:[]});
+  return nid;
+}
+function addRoot(){
+  if (focusId){ focusId = null; msg('Đã bỏ focus để thêm box gốc'); }
+  snap(null);
+  var id = nn('','','','CC', null);
+  rootIds.push(id); select(id, true);
+}
+function addChild(pid){
+  snap(null);
+  var p = nodes.get(pid);
+  p.collapsed = false;
+  var r = Math.min(8, rnum(p.t) + 1);
+  var id = nn('','','', LEVELS[r], pid);
+  p.children.push(id); select(id, true);
+}
+function addSib(id){
+  snap(null);
+  var n = nodes.get(id);
+  var nid = nn('','','', n.t, n.parent);
+  var arr = n.parent ? nodes.get(n.parent).children : rootIds;
+  arr.splice(arr.indexOf(id) + 1, 0, nid);
+  select(nid, true);
+}
+function subCount(id){
+  var n = nodes.get(id), s = 1;
+  n.children.forEach(function(c){ s += subCount(c); });
+  return s;
+}
+function wipe(id){
+  var n = nodes.get(id);
+  n.children.forEach(wipe);
+  nodes.delete(id);
+}
+function delNode(id){
+  var n = nodes.get(id);
+  if (n.children.length &&
+      !confirm('Xóa "' + dispName(n) + '" cùng ' + (subCount(id)-1) + ' box cấp dưới?')) return;
+  snap(null);
+  var arr = n.parent ? nodes.get(n.parent).children : rootIds;
+  arr.splice(arr.indexOf(id), 1);
+  wipe(id);
+  if (focusId && !nodes.has(focusId)) focusId = null;
+  fcGroups.forEach(function(g){ if (g.cbqlns && !nodes.has(g.cbqlns)) g.cbqlns = null; });
+  sel = null; renderAll();
+}
+function moveSib(id, dir){
+  var n = nodes.get(id);
+  var arr = n.parent ? nodes.get(n.parent).children : rootIds;
+  var i = arr.indexOf(id), j = i + dir;
+  if (j < 0 || j >= arr.length) return;
+  snap(null);
+  var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  renderAll();
+}
+function setT(id, t){
+  snap(null);
+  var n = nodes.get(id); n.t = t;
+  var fixed = 0;
+  (function fix(pid){
+    nodes.get(pid).children.forEach(function(c){
+      var ch = nodes.get(c);
+      if (rnum(ch.t) < rnum(nodes.get(pid).t)){ ch.t = nodes.get(pid).t; fixed++; }
+      fix(c);
+    });
+  })(id);
+  if (fixed) msg('Đã nâng ' + fixed + ' box cấp dưới cho khớp cấp mới');
+  renderAll();
+}
+function toggleStar(id){
+  snap(null);
+  var n = nodes.get(id); n.star = !n.star;
+  renderAll();
+}
+function isAncestor(a, b){
+  var p = nodes.get(b) && nodes.get(b).parent;
+  while (p){ if (p === a) return true; p = nodes.get(p).parent; }
+  return false;
+}
+function toggleCollapse(id){
+  var n = nodes.get(id);
+  if (!n.children.length) return;
+  if (!n.collapsed && focusId && isAncestor(id, focusId)){
+    focusId = null; msg('Đã bỏ focus (nhánh focus nằm trong vùng vừa thu gọn)');
+  }
+  snap(null);
+  n.collapsed = !n.collapsed;
+  renderAll();
+}
+function setFocus(id){
+  snap(null);
+  focusId = id;
+  var a = nodes.get(id).parent;
+  while (a){ nodes.get(a).collapsed = false; a = nodes.get(a).parent; }
+  renderAll();
+}
+function clearFocus(){ snap(null); focusId = null; renderAll(); }
+function select(id, focusInput){
+  sel = id; renderAll();
+  if (focusInput){ var f = $('fD'); if (f) f.focus(); }
+}
+
+/* ============ [4] HIỂN THỊ / ẨN ============ */
+function visibleSet(){
+  var allow = null;
+  if (focusId && nodes.has(focusId)){
+    allow = new Set();
+    var a = focusId;
+    while (a){ allow.add(a); a = nodes.get(a).parent; }
+    (function sub(id){
+      allow.add(id);
+      nodes.get(id).children.forEach(sub);
+    })(focusId);
+  }
+  var vis = new Set();
+  function walk(id){
+    if (allow && !allow.has(id)) return;
+    vis.add(id);
+    var n = nodes.get(id);
+    if (!n.collapsed) n.children.forEach(walk);
+  }
+  rootIds.forEach(walk);
+  return vis;
+}
+
+/* ============ [5] LAYOUT THUẦN ============ */
 function layout(){
-  var codes=new Set();
-  function pass1(id){var n=nodes.get(id);var p=n.parent?nodes.get(n.parent):null;
-    n._tn=tnum(n.t)||1;
-    n._k=(p&&p._tn===n._tn)?p._k+1:1;
-    codes.add(n._tn*1000+n._k);
-    n.children.forEach(pass1)}
+  var vis = visibleSet();
+  var rank = new Map(), layer = new Map(), codes = new Set();
+
+  function pass1(id){
+    if (!vis.has(id)) return;
+    var n = nodes.get(id);
+    var p = (n.parent && vis.has(n.parent)) ? n.parent : null;
+    var r = rnum(n.t); if (r < 0) r = 1;
+    var k = (p && rank.get(p) === r) ? layer.get(p) + 1 : 1;
+    rank.set(id, r); layer.set(id, k);
+    codes.add(r * 1000 + k);
+    n.children.forEach(pass1);
+  }
   rootIds.forEach(pass1);
-  var keys=Array.from(codes).sort(function(a,b){return a-b})
-    .map(function(c){return {t:Math.floor(c/1000),k:c%1000,code:c}});
-  var rowOf=new Map();keys.forEach(function(kk,i){rowOf.set(kk.code,i)});
-  var X=new Map(),next=0;
-  function pass2(id){var n=nodes.get(id);
-    n._row=rowOf.get(n._tn*1000+n._k);
-    if(!n.children.length){X.set(id,next++);return next-1}
-    var xs=n.children.map(pass2);
-    var x=(xs[0]+xs[xs.length-1])/2;X.set(id,x);return x}
-  rootIds.forEach(function(r,i){if(i)next+=0.5;pass2(r)});
-  return {X:X,keys:keys}}
-function keyLabel(kk){return kk.k===1?('T'+kk.t):('T'+kk.t+' ('+kk.k+')')}
 
-/* ---------- render ---------- */
-function renderCanvas(){var cv=$('canvas'),svg=$('svg');
-  cv.querySelectorAll('.node').forEach(function(e){e.remove()});
-  while(svg.firstChild)svg.removeChild(svg.firstChild);
-  var L=layout(),maxX=0;
-  L.X.forEach(function(v){if(v>maxX)maxX=v});
-  var W=rootIds.length?PAD*2+(maxX+1)*(BW+GX)-GX:300;
-  var H=rootIds.length?PAD*2+L.keys.length*(BH+GY)-GY:300;
-  cv.style.width=Math.max(W,300)+'px';cv.style.height=Math.max(H,300)+'px';
-  svg.setAttribute('width',Math.max(W,300));svg.setAttribute('height',Math.max(H,300));
-  nodes.forEach(function(n){n._x=PAD+L.X.get(n.id)*(BW+GX);n._y=PAD+n._row*(BH+GY)});
-  var NS='http://www.w3.org/2000/svg';
-  nodes.forEach(function(n){n.children.forEach(function(c){var ch=nodes.get(c);
-    var x1=n._x+BW/2,y1=n._y+BH,x2=ch._x+BW/2,y2=ch._y,m=y1+GY/2;
-    var p=document.createElementNS(NS,'path');
-    p.setAttribute('d','M '+x1+' '+y1+' V '+m+' H '+x2+' V '+y2);
-    p.setAttribute('fill','none');p.setAttribute('stroke','#444');p.setAttribute('stroke-width','1.4');
-    svg.appendChild(p)})});
-  nodes.forEach(function(n){var d=document.createElement('div');
-    d.className='node'+(n.id===sel?' sel':'');
-    d.style.left=n._x+'px';d.style.top=n._y+'px';
-    d.style.background=TCOLOR[n.t]||'#ffffff';
-    var tt=document.createElement('div');tt.className='tt';tt.textContent=n.t||'';
-    var nm=document.createElement('div');nm.className='nm';nm.textContent=n.name||'(chưa đặt tên)';
-    d.appendChild(tt);d.appendChild(nm);
-    d.title=(n.name||'')+(n.t?' · '+n.t:'');
-    d.onclick=function(e){e.stopPropagation();select(n.id)};
-    d.ondblclick=function(e){e.stopPropagation();select(n.id,true)};
-    cv.appendChild(d)})}
+  var keys = Array.from(codes).sort(function(a,b){ return a-b; })
+    .map(function(c){ return {r: Math.floor(c/1000), k: c%1000, code: c}; });
+  var rowOf = new Map(); keys.forEach(function(kk,i){ rowOf.set(kk.code, i); });
 
-function renderPanel(){var p=$('panel');
-  if(!sel||!nodes.has(sel)){
-    p.innerHTML='<h2>Chi tiết</h2><div class="hint">Chọn một box để sửa.<br><br>Bắt đầu: bấm “＋ Box gốc”, đặt tên, chọn cấp T, rồi “＋ Cấp dưới” để mở rank tiếp theo.<br><br>Kéo chuột trên nền để di chuyển vùng nhìn.<br><br>Cấp T của box con tối thiểu bằng cấp T của box cha.</div>';return}
-  var n=nodes.get(sel);
-  var minT=n.parent?tnum(nodes.get(n.parent).t):1;
-  var opts='';for(var i=minT;i<=8;i++)opts+='<option>T'+i+'</option>';
-  p.innerHTML='<h2>Chi tiết box</h2>'
-   +'<label>Tên chức danh / đơn vị</label><input id="fName" autocomplete="off">'
-   +'<label>Cấp T'+(minT>1?' (tối thiểu T'+minT+' theo cấp cha)':'')+'</label><select id="fT">'+opts+'</select>'
-   +'<div class="row"><button id="bChild" class="primary">＋ Cấp dưới</button><button id="bSib">＋ Ngang hàng</button></div>'
-   +'<div class="row"><button id="bL">◀</button><button id="bR">▶</button><button id="bDel" class="danger">Xóa</button></div>'
-   +'<div class="hint" style="margin-top:10px">◀ ▶ đổi thứ tự với box ngang hàng.</div>';
-  var f=$('fName');f.value=n.name;
-  f.oninput=function(){n.name=f.value;renderCanvas();renderTable()};
-  var s=$('fT');s.value=n.t;
-  s.onchange=function(){setT(n.id,s.value)};
-  $('bChild').onclick=function(){addChild(sel)};
-  $('bSib').onclick=function(){addSib(sel)};
-  $('bL').onclick=function(){moveSib(sel,-1)};
-  $('bR').onclick=function(){moveSib(sel,1)};
-  $('bDel').onclick=function(){delNode(sel)}}
+  var row = new Map(), X = new Map(), next = 0;
+  function pass2(id){
+    var n = nodes.get(id);
+    row.set(id, rowOf.get(rank.get(id)*1000 + layer.get(id)));
+    var kids = n.children.filter(function(c){ return vis.has(c); });
+    var x;
+    if (!kids.length){ x = next++; }
+    else {
+      var xs = kids.map(pass2);
+      x = (xs[0] + xs[xs.length-1]) / 2;
+    }
+    X.set(id, x); return x;
+  }
+  rootIds.forEach(function(r, i){
+    if (!vis.has(r)) return;
+    if (i && next) next += 0.5;
+    pass2(r);
+  });
 
-function paths(){var out=[];
-  function dfs(id,acc){var n=nodes.get(id);var a=acc.concat([n]);
-    if(!n.children.length){out.push(a);return}
-    n.children.forEach(function(c){dfs(c,a)})}
-  rootIds.forEach(function(r){dfs(r,[])});return out}
+  var pos = new Map();
+  vis.forEach(function(id){
+    pos.set(id, { x: PAD + X.get(id)*(BW+GX),
+                  y: PAD + row.get(id)*(BH+GY) });
+  });
+  return { vis:vis, row:row, pos:pos, keys:keys };
+}
+function keyLabel(kk){
+  var L = LEVELS[kk.r];
+  return kk.k === 1 ? L : (L + ' (' + kk.k + ')');
+}
 
-/* bảng và TSV dùng chung một lưới: cột = hàng của chart */
-function buildGrid(){var L=layout();
-  var header=L.keys.map(keyLabel);
-  var rows=paths().map(function(pth){
-    var cells=new Array(L.keys.length).fill('');
-    var first=pth[0]._row,last=pth[pth.length-1]._row;
-    for(var c=first;c<=last;c++)cells[c]='—';
-    pth.forEach(function(n){cells[n._row]=n.name||'(chưa đặt tên)'});
-    return cells});
-  return {header:header,rows:rows}}
+/* ============ [6] RENDER TAB SƠ ĐỒ ============ */
+function renderCanvas(L){
+  var cv = $('canvas'), svg = $('svg');
+  cv.querySelectorAll('.node').forEach(function(e){ e.remove(); });
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
 
-function renderTable(){var host=$('tblHost');host.innerHTML='';
-  if(!rootIds.length){host.innerHTML='<div class="hint">Bảng sẽ tự cập nhật khi bạn vẽ. Mỗi nhánh là một dòng; mỗi cột là một hàng cấp T trên chart. Ô “—” nghĩa là nhánh đi xuyên qua cấp đó.</div>';return}
-  var g=buildGrid();
-  var sc=document.createElement('div');sc.id='tblScroll';
-  var tb=document.createElement('table'),tr=document.createElement('tr');
-  g.header.forEach(function(h){var th=document.createElement('th');th.textContent=h;tr.appendChild(th)});
+  var maxX = 0;
+  L.pos.forEach(function(p){ if (p.x > maxX) maxX = p.x; });
+  var W = L.vis.size ? maxX + BW + PAD : 300;
+  var H = L.vis.size ? PAD*2 + L.keys.length*(BH+GY) - GY : 300;
+  cv.style.width  = Math.max(W, 300) + 'px';
+  cv.style.height = Math.max(H, 300) + 'px';
+  svg.setAttribute('width',  Math.max(W, 300));
+  svg.setAttribute('height', Math.max(H, 300));
+
+  var NS = 'http://www.w3.org/2000/svg';
+  L.vis.forEach(function(id){
+    var n = nodes.get(id);
+    n.children.forEach(function(c){
+      if (!L.vis.has(c)) return;
+      var a = L.pos.get(id), b = L.pos.get(c);
+      var x1 = a.x + BW/2, y1 = a.y + BH, x2 = b.x + BW/2, y2 = b.y, m = y1 + GY/2;
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', 'M '+x1+' '+y1+' V '+m+' H '+x2+' V '+y2);
+      p.setAttribute('fill','none'); p.setAttribute('stroke','#444'); p.setAttribute('stroke-width','1.4');
+      svg.appendChild(p);
+    });
+  });
+
+  L.vis.forEach(function(id){
+    var n = nodes.get(id), pv = L.pos.get(id);
+    var d = document.createElement('div');
+    d.className = 'node' + (id === sel ? ' sel' : '');
+    d.style.left = pv.x + 'px'; d.style.top = pv.y + 'px';
+    d.style.background = TCOLOR[n.t] || '#ffffff';
+
+    var tt = document.createElement('div'); tt.className='tt'; tt.textContent = n.t; d.appendChild(tt);
+    if (n.star){
+      var st = document.createElement('div'); st.className='st'; st.textContent='★';
+      st.title = 'CBQLNS — Cán bộ quản lý ngân sách'; d.appendChild(st);
+    }
+    var any = false;
+    if (n.dept){  var e1=document.createElement('div'); e1.className='bd'; e1.textContent=n.dept;  d.appendChild(e1); any=true; }
+    if (n.title){ var e2=document.createElement('div'); e2.className='bt'; e2.textContent=n.title; d.appendChild(e2); any=true; }
+    if (n.person){var e3=document.createElement('div'); e3.className='bp'; e3.textContent=n.person;d.appendChild(e3); any=true; }
+    if (!any){    var e0=document.createElement('div'); e0.className='be'; e0.textContent='(chưa nhập)'; d.appendChild(e0); }
+
+    if (n.collapsed && n.children.length){
+      var hd = document.createElement('div'); hd.className='hid';
+      hd.textContent = '+' + (subCount(id)-1);
+      hd.title = 'Đang ẩn ' + (subCount(id)-1) + ' box cấp dưới — bấm để bung';
+      hd.onclick = function(e){ e.stopPropagation(); toggleCollapse(id); };
+      d.appendChild(hd);
+    }
+    d.title = cellText(n) + '\n[' + n.t + ']';
+    d.onclick    = function(e){ e.stopPropagation(); select(id); };
+    d.ondblclick = function(e){ e.stopPropagation(); select(id, true); };
+    cv.appendChild(d);
+  });
+
+  var chip = $('focusChip');
+  if (focusId && nodes.has(focusId)){
+    chip.hidden = false; $('focusName').textContent = dispName(nodes.get(focusId));
+  } else chip.hidden = true;
+}
+
+function renderPanel(){
+  var p = $('panel');
+  if (!sel || !nodes.has(sel)){
+    p.innerHTML = '<h2>Chi tiết</h2><div class="hint">Chọn một box để sửa.'
+      + '<br><br>Bắt đầu: bấm “＋ Box gốc”, nhập thông tin, rồi “＋ Cấp dưới”.'
+      + '<br><br>Kéo chuột trên nền để di chuyển vùng nhìn. Ctrl+Z để hoàn tác.'
+      + '<br><br>Cấp cao nhất là CC, rồi tới T1…T8. Cấp của box con tối thiểu bằng cấp của box cha.'
+      + '<br><br>★ = CBQLNS (cán bộ quản lý ngân sách), dùng cho tab Luồng duyệt.</div>';
+    return;
+  }
+  var n = nodes.get(sel);
+  var minR = n.parent ? rnum(nodes.get(n.parent).t) : 0;
+  var opts = '';
+  for (var i = minR; i <= 8; i++) opts += '<option>' + LEVELS[i] + '</option>';
+
+  p.innerHTML =
+      '<h2>Chi tiết box</h2>'
+    + '<label>Tên phòng / khối (tự IN HOA, đậm)</label><input id="fD" autocomplete="off">'
+    + '<label>Chức danh (đậm)</label><input id="fC" autocomplete="off">'
+    + '<label>Người phụ trách (nghiêng)</label><input id="fP" autocomplete="off">'
+    + '<label>Cấp' + (minR > 0 ? ' (tối thiểu ' + LEVELS[minR] + ' theo cấp cha)' : '') + '</label>'
+    + '<select id="fT">' + opts + '</select>'
+    + '<div class="ck"><input type="checkbox" id="fStar"><label for="fStar" style="margin:0">★ CBQLNS (quản lý ngân sách)</label></div>'
+    + '<div class="row"><button id="bChild" class="primary">＋ Cấp dưới</button><button id="bSib">＋ Ngang hàng</button></div>'
+    + '<div class="row"><button id="bClps">' + (n.collapsed ? 'Bung cấp dưới' : 'Thu gọn cấp dưới') + '</button>'
+    +   '<button id="bFocus">' + (focusId === sel ? 'Bỏ focus' : 'Focus nhánh') + '</button></div>'
+    + '<div class="row"><button id="bL">◀</button><button id="bR">▶</button><button id="bDel" class="danger">Xóa</button></div>'
+    + '<div class="hint" style="margin-top:10px">◀ ▶ đổi thứ tự với box ngang hàng. '
+    + 'Chữ dài quá khung sẽ thu gọn bằng “…”, rê chuột vào box để xem đủ.</div>';
+
+  var fD = $('fD'); fD.value = n.dept;
+  fD.oninput = function(){
+    snap('e:' + sel + ':d');
+    var s = fD.selectionStart, up = fD.value.toUpperCase();
+    if (up !== fD.value){ fD.value = up; try{ fD.setSelectionRange(s,s); }catch(_){/**/} }
+    n.dept = fD.value; refreshView();
+  };
+  var fC = $('fC'); fC.value = n.title;
+  fC.oninput = function(){ snap('e:' + sel + ':c'); n.title = fC.value; refreshView(); };
+  var fP = $('fP'); fP.value = n.person;
+  fP.oninput = function(){ snap('e:' + sel + ':p'); n.person = fP.value; refreshView(); };
+
+  var sT = $('fT'); sT.value = n.t;
+  sT.onchange = function(){ setT(sel, sT.value); };
+  var ck = $('fStar'); ck.checked = !!n.star;
+  ck.onchange = function(){ toggleStar(sel); };
+
+  if (!n.children.length) $('bClps').disabled = true;
+  $('bClps').onclick  = function(){ toggleCollapse(sel); };
+  $('bFocus').onclick = function(){ (focusId === sel) ? clearFocus() : setFocus(sel); };
+  $('bChild').onclick = function(){ addChild(sel); };
+  $('bSib').onclick   = function(){ addSib(sel); };
+  $('bL').onclick     = function(){ moveSib(sel,-1); };
+  $('bR').onclick     = function(){ moveSib(sel, 1); };
+  $('bDel').onclick   = function(){ delNode(sel); };
+}
+
+function paths(vis){
+  var out = [];
+  function dfs(id, acc){
+    var n = nodes.get(id), a = acc.concat([n]);
+    var kids = n.children.filter(function(c){ return vis.has(c); });
+    if (!kids.length){ out.push(a); return; }
+    kids.forEach(function(c){ dfs(c, a); });
+  }
+  rootIds.forEach(function(r){ if (vis.has(r)) dfs(r, []); });
+  return out;
+}
+
+function buildGrid(L){
+  var header = L.keys.map(keyLabel);
+  var rows = paths(L.vis).map(function(pth){
+    var cells = new Array(L.keys.length).fill('');
+    var first = L.row.get(pth[0].id), last = L.row.get(pth[pth.length-1].id);
+    for (var c = first; c <= last; c++) cells[c] = '—';
+    pth.forEach(function(n){ cells[L.row.get(n.id)] = cellText(n); });
+    return cells;
+  });
+  return { header: header, rows: rows };
+}
+
+// Bảng phân cấp: colgroup cố định độ rộng MỖI cột (COLW_ORG px)
+// -> tên dài tự ngắt dòng trong cột, tổng bề rộng = số cột × COLW_ORG, cuộn ngang trong .scrollTbl
+function renderTable(L){
+  var host = $('tblHost'); host.innerHTML = '';
+  if (!L.vis.size){
+    host.innerHTML = '<div class="hint">Bảng sẽ tự cập nhật khi bạn vẽ. Mỗi nhánh là một dòng; '
+      + 'mỗi cột là một hàng cấp trên chart. Ô “—” nghĩa là nhánh đi xuyên qua cấp đó.</div>';
+    return;
+  }
+  var g = buildGrid(L);
+  var sc = document.createElement('div'); sc.className = 'scrollTbl';
+  var tb = document.createElement('table');
+  tb.style.tableLayout = 'fixed';
+  var cg = document.createElement('colgroup');
+  g.header.forEach(function(){
+    var c = document.createElement('col'); c.style.width = COLW_ORG + 'px'; cg.appendChild(c);
+  });
+  tb.appendChild(cg);
+  var tr = document.createElement('tr');
+  g.header.forEach(function(h){ var th=document.createElement('th'); th.textContent=h; tr.appendChild(th); });
   tb.appendChild(tr);
-  g.rows.forEach(function(r){var trr=document.createElement('tr');
-    r.forEach(function(cell){var td=document.createElement('td');
-      td.textContent=cell;if(cell==='—')td.className='dash';
-      trr.appendChild(td)});
-    tb.appendChild(trr)});
-  sc.appendChild(tb);host.appendChild(sc)}
+  g.rows.forEach(function(r){
+    var trr = document.createElement('tr');
+    r.forEach(function(cell){
+      var td = document.createElement('td');
+      td.textContent = cell;
+      if (cell === '—') td.className = 'dash';
+      trr.appendChild(td);
+    });
+    tb.appendChild(trr);
+  });
+  sc.appendChild(tb); host.appendChild(sc);
+}
 
-function renderAll(){renderCanvas();renderPanel();renderTable()}
+function renderAll(){
+  var L = layout();
+  if (sel && !L.vis.has(sel)) sel = null;
+  renderCanvas(L); renderPanel(); renderTable(L); renderFlow();
+}
+function refreshView(){
+  var L = layout();
+  renderCanvas(L); renderTable(L); refreshFlowResultSoon();
+}
 
-/* ---------- xuất / lưu ---------- */
-function tsv(){var g=buildGrid();
-  var lines=[g.header.join('\t')];
-  g.rows.forEach(function(r){lines.push(r.join('\t'))});
-  return lines.join('\n')}
-function copyTable(){if(!rootIds.length){msg('Chưa có gì để copy');return}
-  var t=tsv();
-  function ok(){msg('Đã copy — dán thẳng vào Excel')}
-  function fb(){var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();
-    try{document.execCommand('copy');ok()}catch(e){msg('Trình duyệt chặn copy')}
-    document.body.removeChild(ta)}
-  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb)}else fb()}
-function dl(blob,name){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
-  setTimeout(function(){URL.revokeObjectURL(a.href)},500)}
-function ser(id){var n=nodes.get(id);return{name:n.name,t:n.t,children:n.children.map(ser)}}
-function saveJSON(){dl(new Blob([JSON.stringify({v:2,roots:rootIds.map(ser)},null,1)],{type:'application/json'}),'orgchart.json');msg('Đã tải orgchart.json')}
-function loadJSON(file){file.text().then(function(txt){var d=JSON.parse(txt);
-    nodes=new Map();rootIds=[];seq=1;sel=null;
-    function mk(o,parentId){
-      var pt=parentId?tnum(nodes.get(parentId).t):1;
-      var tn=tnum(o.t);
-      if(!tn)tn=parentId?Math.min(8,pt+1):1;   // file cũ có T trống
-      if(tn<pt)tn=pt;                           // vi phạm ràng buộc -> kẹp về T cha
-      var id=nn(o.name||'','T'+tn,parentId);
-      (o.children||[]).forEach(function(c){nodes.get(id).children.push(mk(c,id))});
-      return id}
-    (d.roots||[]).forEach(function(r){rootIds.push(mk(r,null))});
-    renderAll();msg('Đã mở file')
-  }).catch(function(){msg('File JSON không hợp lệ')})}
-function xesc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function exportDrawio(){if(!rootIds.length){msg('Chưa có gì để xuất');return}
-  renderCanvas();
-  var cells='<mxCell id="0"/><mxCell id="1" parent="0"/>';
-  nodes.forEach(function(n){
-    var fill=TCOLOR[n.t]||'#FFFFFF';
-    cells+='<object label="'+xesc(n.name)+'" cap_T="'+xesc(n.t||'')+'" id="'+n.id+'">'
-      +'<mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor='+fill+';strokeColor=#000000;" vertex="1" parent="1">'
-      +'<mxGeometry x="'+n._x+'" y="'+n._y+'" width="'+BW+'" height="'+BH+'" as="geometry"/></mxCell></object>'});
-  var i=0;
-  nodes.forEach(function(n){n.children.forEach(function(c){
-    cells+='<mxCell id="e'+(++i)+'" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=none;" edge="1" parent="1" source="'+n.id+'" target="'+c+'">'
-      +'<mxGeometry relative="1" as="geometry"/></mxCell>'})});
-  var xml='<mxfile host="app.diagrams.net"><diagram name="Org" id="org1">'
-    +'<mxGraphModel dx="1000" dy="800" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1200"><root>'
-    +cells+'</root></mxGraphModel></diagram></mxfile>';
-  dl(new Blob([xml],{type:'application/xml'}),'orgchart.drawio');msg('Đã tải orgchart.drawio')}
+/* ============ [7] XUẤT & LƯU ============ */
+function q(s){ return /[\t\n"]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s; }
+function tsv(){
+  var g = buildGrid(layout());
+  var lines = [ g.header.map(q).join('\t') ];
+  g.rows.forEach(function(r){ lines.push(r.map(q).join('\t')); });
+  return lines.join('\n');
+}
+function copyText(t, okMsg){
+  function ok(){ msg(okMsg); }
+  function fb(){
+    var ta = document.createElement('textarea'); ta.value = t;
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); ok(); }catch(e){ msg('Trình duyệt chặn copy'); }
+    document.body.removeChild(ta);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(ok, fb);
+  } else fb();
+}
+function copyTable(){
+  var L = layout();
+  if (!L.vis.size){ msg('Chưa có gì để copy'); return; }
+  var hidden = nodes.size - L.vis.size;
+  copyText(tsv(), 'Đã copy theo view hiện tại' + (hidden ? ' (đang ẩn ' + hidden + ' box)' : '') + ' — dán thẳng vào Excel');
+}
+function dl(blob, name){
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 500);
+}
+function ser(id){
+  var n = nodes.get(id);
+  return { id:n.id, dept:n.dept, title:n.title, person:n.person, t:n.t,
+           star: n.star || undefined,
+           collapsed: n.collapsed || undefined,
+           focus: (id === focusId) || undefined,
+           children: n.children.map(ser) };
+}
+function saveJSON(){
+  dl(new Blob([JSON.stringify(serializeAll(), null, 1)], {type:'application/json'}), 'orgchart.json');
+  dirty = false;
+  msg('Đã tải orgchart.json');
+}
+function applyState(d){
+  if (!d || typeof d !== 'object' || !Array.isArray(d.roots)) throw new Error('bad root');
 
-/* ---------- kéo nền để di chuyển vùng nhìn ---------- */
-(function(){var cw=$('canvasWrap');
-  var active=false,moved=false,px=0,py=0,sx=0,sy=0,pid=null;
-  cw.addEventListener('pointerdown',function(e){
-    if(e.button!==undefined&&e.button!==0)return;
-    if(e.target.closest('.node'))return;
-    active=true;moved=false;pid=e.pointerId;
-    px=e.clientX;py=e.clientY;sx=cw.scrollLeft;sy=cw.scrollTop;
-    if(cw.setPointerCapture&&pid!=null){try{cw.setPointerCapture(pid)}catch(_){/**/}}});
-  cw.addEventListener('pointermove',function(e){
-    if(!active)return;
-    var dx=e.clientX-px,dy=e.clientY-py;
-    if(!moved&&(Math.abs(dx)>5||Math.abs(dy)>5)){moved=true;cw.classList.add('panning')}
-    if(moved){cw.scrollLeft=sx-dx;cw.scrollTop=sy-dy}});
-  function up(){if(!active)return;active=false;cw.classList.remove('panning');
-    if(cw.releasePointerCapture&&pid!=null){try{cw.releasePointerCapture(pid)}catch(_){/**/}}
-    pid=null}
-  cw.addEventListener('pointerup',up);
-  cw.addEventListener('pointercancel',up);
-  cw.addEventListener('click',function(e){
-    if(moved){moved=false;e.stopPropagation();e.preventDefault();return}
-    if(!e.target.closest('.node')){sel=null;renderAll()}
-  },true);
+  var used = new Set(), maxN = 0;
+  (function scan(list){
+    list.forEach(function(o){
+      if (o && typeof o.id === 'string' && /^n\d+$/.test(o.id)){
+        used.add(o.id);
+        var v = parseInt(o.id.slice(1), 10); if (v > maxN) maxN = v;
+      }
+      if (o && Array.isArray(o.children)) scan(o.children);
+    });
+  })(d.roots);
+  function genId(){ do { maxN++; } while (used.has('n'+maxN)); return 'n'+maxN; }
+
+  var tN = new Map(), tRoots = [], tFocus = null;
+  function mk(o, parentId){
+    if (!o || typeof o !== 'object') throw new Error('bad node');
+    var pr = parentId ? rnum(tN.get(parentId).t) : 0;
+    var r  = rnum(o.t);
+    if (r < 0) r = parentId ? Math.min(8, pr+1) : 0;
+    if (parentId && r < pr) r = pr;
+    var id = (typeof o.id === 'string' && /^n\d+$/.test(o.id) && !tN.has(o.id)) ? o.id : genId();
+    tN.set(id, { id:id,
+                 dept:  String(o.dept  || '').toUpperCase(),
+                 title: String(o.title || ''),
+                 person:String(o.person|| ''),
+                 t: LEVELS[r],
+                 star: !!o.star, collapsed: !!o.collapsed,
+                 parent: parentId, children: [] });
+    if (o.focus && !tFocus) tFocus = id;
+    (o.children || []).forEach(function(c){ tN.get(id).children.push(mk(c, id)); });
+    return id;
+  }
+  d.roots.forEach(function(rt){ tRoots.push(mk(rt, null)); });
+
+  var f = d.finance || {};
+  var tFin = { cfo:String(f.cfo||''), gdtc:String(f.gdtc||''), tptc:String(f.tptc||'') };
+
+  var tG = [], tF = [], maxG = 0, maxF = 0;
+  (Array.isArray(d.fcGroups) ? d.fcGroups : []).forEach(function(g){
+    if (!g || typeof g !== 'object') return;
+    var okId = (typeof g.id === 'string' && /^g\d+$/.test(g.id));
+    if (okId){ var v = parseInt(g.id.slice(1), 10); if (v > maxG) maxG = v; }
+    tG.push({ id: okId ? g.id : ('g' + (++maxG)),
+              name: String(g.name||''),
+              cbqlns: (g.cbqlns && tN.has(g.cbqlns)) ? g.cbqlns : null });
+  });
+  (Array.isArray(d.fcs) ? d.fcs : []).forEach(function(x){
+    if (!x || typeof x !== 'object') return;
+    var okId = (typeof x.id === 'string' && /^f\d+$/.test(x.id));
+    if (okId){ var v = parseInt(x.id.slice(1), 10); if (v > maxF) maxF = v; }
+    var gid = tG.some(function(g){ return g.id === x.groupId; }) ? x.groupId : null;
+    tF.push({ id: okId ? x.id : ('f' + (++maxF)),
+              code: String(x.code||''), name: String(x.name||''), groupId: gid });
+  });
+  var tRules = (d.flowRules && typeof d.flowRules === 'object' && d.flowRules.steps)
+             ? d.flowRules : JSON.parse(JSON.stringify(FLOW_DEFAULT));
+
+  nodes = tN; rootIds = tRoots; focusId = tFocus;
+  finance = tFin; fcGroups = tG; fcs = tF; flowRules = tRules;
+  seq = maxN + 1; gseq = maxG + 1; fseq = maxF + 1;
+  sel = null;
+}
+function loadJSON(file){
+  file.text().then(function(txt){
+    var d;
+    try { d = JSON.parse(txt); }
+    catch(e){ msg('File không phải JSON hợp lệ — giữ nguyên dữ liệu hiện tại'); return; }
+    try { applyState(d); }
+    catch(e){ msg('Cấu trúc file không đúng — giữ nguyên dữ liệu hiện tại'); return; }
+    undoStack.length = 0; lastSnapKey = null; dirty = false;
+    renderAll(); msg('Đã mở file');
+  }).catch(function(){ msg('Không đọc được file'); });
+}
+function xesc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function exportDrawio(){
+  var L = layout();
+  if (!L.vis.size){ msg('Chưa có gì để xuất'); return; }
+  var cells = '<mxCell id="0"/><mxCell id="1" parent="0"/>';
+  L.vis.forEach(function(id){
+    var n = nodes.get(id), pv = L.pos.get(id);
+    var fill = TCOLOR[n.t] || '#FFFFFF';
+    var parts = [];
+    if (n.dept)   parts.push('<b>' + xesc(n.dept) + '</b>');
+    if (n.title)  parts.push('<b>' + xesc(n.title) + '</b>');
+    if (n.person) parts.push('<i>' + xesc(n.person) + '</i>');
+    cells += '<object label="' + xesc(parts.join('<br>')) + '" cap_T="' + xesc(n.t) + '"'
+          +  ' dept="' + xesc(n.dept) + '" title_role="' + xesc(n.title) + '"'
+          +  ' person="' + xesc(n.person) + '"' + (n.star ? ' cbqlns="1"' : '') + ' id="' + id + '">'
+          +  '<mxCell style="rounded=0;whiteSpace=wrap;html=1;fillColor=' + fill + ';strokeColor=#000000;" vertex="1" parent="1">'
+          +  '<mxGeometry x="' + pv.x + '" y="' + pv.y + '" width="' + BW + '" height="' + BH + '" as="geometry"/>'
+          +  '</mxCell></object>';
+  });
+  var i = 0;
+  L.vis.forEach(function(id){
+    nodes.get(id).children.forEach(function(c){
+      if (!L.vis.has(c)) return;
+      cells += '<mxCell id="e' + (++i) + '" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=none;"'
+            +  ' edge="1" parent="1" source="' + id + '" target="' + c + '">'
+            +  '<mxGeometry relative="1" as="geometry"/></mxCell>';
+    });
+  });
+  var xml = '<mxfile host="app.diagrams.net"><diagram name="Org" id="org1">'
+          + '<mxGraphModel dx="1000" dy="800" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="1200"><root>'
+          + cells + '</root></mxGraphModel></diagram></mxfile>';
+  dl(new Blob([xml], {type:'application/xml'}), 'orgchart.drawio');
+  var hidden = nodes.size - L.vis.size;
+  msg('Đã tải orgchart.drawio' + (hidden ? ' (theo view — đang ẩn ' + hidden + ' box)' : ''));
+}
+
+/* ============ [8] TAB LUỒNG DUYỆT ============ */
+/* [8a] Engine: token vai trò -> người. Luật nằm trong flowRules (đi kèm JSON). */
+var FIN_TITLES = { cfo:'CFO', gdtc:'Giám đốc Tài chính Thị trường', tptc:'Trưởng phòng Tài chính' };
+var flowViewByFc = false;                     // false = gộp theo nhóm (mặc định)
+var refreshFlowResultSoon = debounce(function(){ renderFlowResult(); }, 150);
+
+function starredNodes(){
+  var out = [];
+  nodes.forEach(function(n){ if (n.star) out.push(n); });
+  return out;
+}
+function resolveRole(token, cb){
+  switch (token){
+    case 'CBQLNS':
+      return cb ? roleText(cb) + (cb.star ? '' : '\n(box đã bỏ ★)') : '(chưa gán CBQLNS)';
+    case 'CAP_TREN_CBQLNS': {
+      if (!cb) return '(chưa gán CBQLNS)';
+      var p = cb.parent ? nodes.get(cb.parent) : null;
+      return p ? roleText(p) : '(CBQLNS không có cấp trên)';
+    }
+    case 'FIN_CFO':  return FIN_TITLES.cfo  + '\n' + (finance.cfo  || '(chưa nhập)');
+    case 'FIN_GDTC': return FIN_TITLES.gdtc + '\n' + (finance.gdtc || '(chưa nhập)');
+    case 'FIN_TPTC': return FIN_TITLES.tptc + '\n' + (finance.tptc || '(chưa nhập)');
+    case 'PENDING':  return '(chưa ĐN — cấp Global)';
+    default:         return '—';
+  }
+}
+
+// renderFlow: dựng lại TOÀN BỘ tab (dùng khi đổi tab / undo / mở file / thay đổi từ tab Sơ đồ).
+// Các thao tác lẻ bên trong tab dùng cập nhật ĐÍCH DANH ở dưới, không gọi hàm này.
+function renderFlow(){ renderFinance(); renderGroups(); renderFcs(); updateGroupCounts(); renderFlowResult(); }
+
+function renderFinance(){
+  [['finCfo','cfo'],['finGdtc','gdtc'],['finTptc','tptc']].forEach(function(pair){
+    var el = $(pair[0]);
+    if (document.activeElement !== el && el.value !== finance[pair[1]]) el.value = finance[pair[1]];
+  });
+}
+
+/* ---------- [8b] NHÓM FC — cập nhật đích danh ---------- */
+function groupOption(g){
+  var o = document.createElement('option');
+  o.value = g.id; o.textContent = g.name || '(nhóm chưa đặt tên)';
+  return o;
+}
+// Sửa tên nhóm -> vá NHÃN option trong mọi select của bảng FC ngay tại chỗ
+// (đây là chỗ trước đây bị sót khiến dropdown FC hiện tên cũ)
+function patchGroupOptionLabels(g){
+  document.querySelectorAll('#fcTbody select option[value="' + g.id + '"]').forEach(function(o){
+    o.textContent = g.name || '(nhóm chưa đặt tên)';
+  });
+}
+function groupRow(g){
+  var row = document.createElement('div'); row.className = 'miniRow'; row.dataset.gid = g.id;
+  var inp = document.createElement('input'); inp.className = 'w2';
+  inp.placeholder = 'Tên nhóm'; inp.value = g.name;
+  inp.oninput = function(){
+    snap('g:' + g.id);
+    g.name = inp.value;
+    patchGroupOptionLabels(g);          // dropdown FC cập nhật tức thì
+    refreshFlowResultSoon();
+  };
+  var selE = document.createElement('select');
+  var o0 = document.createElement('option'); o0.value=''; o0.textContent='(chưa gán CBQLNS)';
+  selE.appendChild(o0);
+  var stars = starredNodes();
+  if (g.cbqlns && nodes.has(g.cbqlns) && !nodes.get(g.cbqlns).star) stars.push(nodes.get(g.cbqlns));
+  stars.forEach(function(n){
+    var o = document.createElement('option');
+    o.value = n.id;
+    o.textContent = (n.star ? '★ ' : '(đã bỏ ★) ') + dispName(n) + (n.person ? ' — ' + n.person : '');
+    selE.appendChild(o);
+  });
+  selE.value = g.cbqlns || '';
+  selE.onchange = function(){ snap(null); g.cbqlns = selE.value || null; renderFlowResult(); };
+
+  var cnt = document.createElement('span'); cnt.className='gcnt'; cnt.id = 'gcnt_' + g.id;
+  var del = document.createElement('button'); del.className='danger'; del.textContent='✕';
+  del.title = 'Xóa nhóm';
+  del.onclick = function(){ delGroup(g, row); };
+  row.appendChild(inp); row.appendChild(selE); row.appendChild(cnt); row.appendChild(del);
+  return row;
+}
+function renderGroups(){
+  var gl = $('grpList'); gl.innerHTML = '';
+  if (!fcGroups.length){ gl.innerHTML = '<div class="hint" id="grpEmpty">Chưa có nhóm nào.</div>'; return; }
+  fcGroups.forEach(function(g){ gl.appendChild(groupRow(g)); });
+}
+function addGroup(){
+  snap(null);
+  var g = { id:'g' + (gseq++), name:'', cbqlns:null };
+  fcGroups.push(g);
+  var empty = $('grpEmpty'); if (empty) empty.remove();
+  $('grpList').appendChild(groupRow(g));                       // append 1 dòng, không đập cả list
+  document.querySelectorAll('#fcTbody select').forEach(function(s){  // mọi dropdown FC nhận option mới NGAY
+    s.appendChild(groupOption(g));
+  });
+  updateGroupCounts();
+  renderFlowResult();
+}
+function delGroup(g, rowEl){
+  snap(null);
+  fcGroups = fcGroups.filter(function(x){ return x !== g; });
+  fcs.forEach(function(f){ if (f.groupId === g.id) f.groupId = null; });
+  if (rowEl) rowEl.remove();
+  document.querySelectorAll('#fcTbody select').forEach(function(s){
+    var o = s.querySelector('option[value="' + g.id + '"]');
+    if (o){ if (s.value === g.id) s.value = ''; o.remove(); }
+  });
+  if (!fcGroups.length) renderGroups();
+  updateGroupCounts();
+  renderFlowResult();
+}
+function updateGroupCounts(){
+  var cnt = {};
+  fcs.forEach(function(f){ if (f.groupId) cnt[f.groupId] = (cnt[f.groupId]||0) + 1; });
+  fcGroups.forEach(function(g){
+    var s = $('gcnt_' + g.id);
+    if (s) s.textContent = '(' + (cnt[g.id]||0) + ' FC)';
+  });
+  $('fcCount').textContent = '(' + fcs.length + ')';
+}
+
+/* ---------- [8c] FUND CENTER — bảng + lọc + dán từ Excel ---------- */
+function fcRow(f){
+  var tr = document.createElement('tr'); tr.dataset.fcid = f.id;
+  var td1 = document.createElement('td');
+  var code = document.createElement('input'); code.placeholder='Mã'; code.value = f.code;
+  code.oninput = function(){ snap('fc:'+f.id+':code'); f.code = code.value; refreshFlowResultSoon(); };
+  td1.appendChild(code);
+  var td2 = document.createElement('td');
+  var name = document.createElement('input'); name.placeholder='Tên'; name.value = f.name;
+  name.oninput = function(){ snap('fc:'+f.id+':name'); f.name = name.value; refreshFlowResultSoon(); };
+  td2.appendChild(name);
+  var td3 = document.createElement('td');
+  var selE = document.createElement('select');
+  var o0 = document.createElement('option'); o0.value=''; o0.textContent='(chưa gán nhóm)';
+  selE.appendChild(o0);
+  fcGroups.forEach(function(g){ selE.appendChild(groupOption(g)); });
+  selE.value = f.groupId || '';
+  selE.onchange = function(){ snap(null); f.groupId = selE.value || null; updateGroupCounts(); renderFlowResult(); };
+  td3.appendChild(selE);
+  var td4 = document.createElement('td');
+  var del = document.createElement('button'); del.className='danger'; del.textContent='✕';
+  del.title = 'Xóa FC';
+  del.onclick = function(){ snap(null); fcs = fcs.filter(function(x){ return x !== f; }); tr.remove(); updateGroupCounts(); renderFlowResult(); };
+  td4.appendChild(del);
+  tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4);
+  return tr;
+}
+function renderFcs(){
+  var tb = $('fcTbody'); tb.innerHTML = '';
+  fcs.forEach(function(f){ tb.appendChild(fcRow(f)); });
+  applyFcFilter();
+}
+function addFc(){
+  snap(null);
+  var f = { id:'f' + (fseq++), code:'', name:'', groupId:null };
+  fcs.push(f);
+  $('fcTbody').appendChild(fcRow(f));                          // append 1 dòng
+  updateGroupCounts();
+  applyFcFilter();
+  renderFlowResult();
+}
+function applyFcFilter(){
+  var qy = ($('fcFilter').value || '').toLowerCase();
+  var gname = {};
+  fcGroups.forEach(function(g){ gname[g.id] = (g.name||'').toLowerCase(); });
+  document.querySelectorAll('#fcTbody tr').forEach(function(tr){
+    var f = fcs.find(function(x){ return x.id === tr.dataset.fcid; });
+    if (!f) return;
+    var hay = (f.code + ' ' + f.name + ' ' + (f.groupId ? (gname[f.groupId]||'') : '')).toLowerCase();
+    tr.style.display = (!qy || hay.indexOf(qy) >= 0) ? '' : 'none';
+  });
+}
+// Dán TSV 3 cột từ Excel: Mã ⇥ Tên ⇥ Tên nhóm. Nhóm khớp theo tên (không phân biệt hoa thường),
+// chưa có thì tạo mới. Dòng header (bắt đầu bằng "Mã"/"Code") tự bỏ qua.
+function importPaste(txt){
+  var lines = String(txt||'').split(/\r?\n/).filter(function(l){ return l.trim(); });
+  if (!lines.length){ msg('Chưa có dữ liệu để nhập'); return; }
+  var first = (lines[0].split('\t')[0]||'').trim().toLowerCase();
+  if (/^(mã|ma\b|code|fc\b)/.test(first)) lines.shift();
+  if (!lines.length){ msg('Chưa có dữ liệu để nhập'); return; }
+  snap(null);
+  var byName = {};
+  fcGroups.forEach(function(g){ byName[(g.name||'').trim().toLowerCase()] = g; });
+  var nFc = 0, nG = 0;
+  lines.forEach(function(l){
+    var c = l.split('\t');
+    var code = (c[0]||'').trim(), name = (c[1]||'').trim(), gn = (c[2]||'').trim();
+    if (!code && !name) return;
+    var gid = null;
+    if (gn){
+      var key = gn.toLowerCase();
+      var g = byName[key];
+      if (!g){ g = { id:'g'+(gseq++), name:gn, cbqlns:null }; fcGroups.push(g); byName[key] = g; nG++; }
+      gid = g.id;
+    }
+    fcs.push({ id:'f'+(fseq++), code:code, name:name, groupId:gid });
+    nFc++;
+  });
+  $('pasteTa').value = ''; $('pasteBox').style.display = 'none';
+  renderGroups(); renderFcs(); updateGroupCounts(); renderFlowResult();
+  msg('Đã nhập ' + nFc + ' FC' + (nG ? (', tạo mới ' + nG + ' nhóm') : ''));
+}
+
+/* ---------- [8d] BẢNG KẾT QUẢ — gộp theo nhóm / bung theo FC ---------- */
+// Luồng duyệt là hàm của NHÓM (mọi FC cùng nhóm chung một luồng),
+// nên mặc định gộp theo nhóm: 10 nhóm = 10 khối × 5 dòng thay vì 40 khối.
+function flowBlocks(){
+  var blocks = [];
+  if (!flowViewByFc){
+    fcGroups.forEach(function(g){
+      var cb = (g.cbqlns && nodes.has(g.cbqlns)) ? nodes.get(g.cbqlns) : null;
+      var codes = fcs.filter(function(f){ return f.groupId === g.id; })
+                     .map(function(f){ return f.code || '(chưa mã)'; });
+      var head = (g.name || '(nhóm chưa đặt tên)')
+        + '\nCBQLNS: ' + (cb ? (cb.person || dispName(cb)) : '(chưa gán)')
+        + '\nFC: ' + (codes.length ? codes.join(', ') : '(chưa có FC)');
+      blocks.push({ head: head, cb: cb });
+    });
+  } else {
+    fcs.forEach(function(f){
+      var g  = fcGroups.find(function(x){ return x.id === f.groupId; }) || null;
+      var cb = (g && g.cbqlns && nodes.has(g.cbqlns)) ? nodes.get(g.cbqlns) : null;
+      var head = (f.code || '(chưa có mã)') + '\n' + (f.name || '')
+        + '\n' + (g ? ('nhóm: ' + (g.name || '(chưa đặt tên)')) : '(chưa gán nhóm)');
+      blocks.push({ head: head, cb: cb });
+    });
+  }
+  return blocks;
+}
+function renderFlowResult(){
+  var host = $('flowResult'); host.innerHTML = '';
+  if (!fcs.length && !fcGroups.length){
+    host.innerHTML = '<div class="hint">Thêm Fund Center (hoặc Dán từ Excel) và gán nhóm/CBQLNS để xem luồng duyệt.</div>';
+    return;
+  }
+  var cols   = flowRules.cols   || FLOW_DEFAULT.cols;
+  var order  = flowRules.order  || FLOW_DEFAULT.order;
+  var colors = flowRules.colors || FLOW_DEFAULT.colors;
+  var steps  = flowRules.steps  || FLOW_DEFAULT.steps;
+
+  var sc = document.createElement('div'); sc.className = 'scrollTbl';
+  var tb = document.createElement('table');
+  tb.style.tableLayout = 'fixed';
+  var cg = document.createElement('colgroup');
+  var c0 = document.createElement('col'); c0.style.width = COLW_FLOW.head + 'px'; cg.appendChild(c0);
+  var c1 = document.createElement('col'); c1.style.width = COLW_FLOW.flow + 'px'; cg.appendChild(c1);
+  cols.forEach(function(){ var c = document.createElement('col'); c.style.width = COLW_FLOW.step + 'px'; cg.appendChild(c); });
+  tb.appendChild(cg);
+
+  var tr = document.createElement('tr');
+  [ flowViewByFc ? 'Fund Center' : 'Nhóm (FC)', 'Luồng' ].concat(cols).forEach(function(h){
+    var th = document.createElement('th'); th.textContent = h; tr.appendChild(th);
+  });
+  tb.appendChild(tr);
+
+  flowBlocks().forEach(function(b){
+    order.forEach(function(flow, idx){
+      var trr = document.createElement('tr');
+      if (idx === 0){
+        var tdf = document.createElement('td');
+        tdf.rowSpan = order.length;
+        tdf.textContent = b.head;
+        trr.appendChild(tdf);
+      }
+      var tdl = document.createElement('td');
+      var dot = document.createElement('span'); dot.className='fdot';
+      dot.style.background = colors[flow] || '#ccc';
+      tdl.appendChild(dot); tdl.appendChild(document.createTextNode(flow));
+      trr.appendChild(tdl);
+      var st = steps[flow] || {};
+      cols.forEach(function(c){
+        var td = document.createElement('td');
+        var token = st[c];
+        var txt = token ? resolveRole(token, b.cb) : '—';
+        td.textContent = txt;
+        if (txt === '—') td.className = 'dash';
+        trr.appendChild(td);
+      });
+      tb.appendChild(trr);
+    });
+  });
+
+  // Ở chế độ gộp nhóm: FC chưa gán nhóm được liệt kê 1 dòng nhắc (không tính được luồng)
+  if (!flowViewByFc){
+    var un = fcs.filter(function(f){ return !f.groupId; });
+    if (un.length){
+      var trU = document.createElement('tr');
+      var tdU = document.createElement('td');
+      tdU.colSpan = cols.length + 2;
+      tdU.textContent = '(Chưa gán nhóm — không tính được luồng) FC: '
+        + un.map(function(f){ return f.code || '(chưa mã)'; }).join(', ');
+      tdU.className = 'dash';
+      trU.appendChild(tdU); tb.appendChild(trU);
+    }
+  }
+  sc.appendChild(tb); host.appendChild(sc);
+}
+function flowTsv(){
+  var cols  = flowRules.cols  || FLOW_DEFAULT.cols;
+  var order = flowRules.order || FLOW_DEFAULT.order;
+  var steps = flowRules.steps || FLOW_DEFAULT.steps;
+  var lines = [ [ flowViewByFc ? 'Fund Center' : 'Nhóm (FC)', 'Luồng' ].concat(cols).map(q).join('\t') ];
+  flowBlocks().forEach(function(b){
+    order.forEach(function(flow){
+      var st = steps[flow] || {};
+      var cells = [ b.head, flow ].concat(cols.map(function(c){
+        var token = st[c];
+        return token ? resolveRole(token, b.cb) : '—';
+      }));
+      lines.push(cells.map(q).join('\t'));
+    });
+  });
+  return lines.join('\n');
+}
+function copyFlowTable(){
+  if (!fcs.length && !fcGroups.length){ msg('Chưa có gì để copy'); return; }
+  copyText(flowTsv(), 'Đã copy bảng luồng (' + (flowViewByFc ? 'theo FC' : 'theo nhóm') + ') — dán thẳng vào Excel');
+}
+
+/* ============ [9] PAN + PHÍM TẮT + NỐI SỰ KIỆN ============ */
+(function(){
+  var cw = $('canvasWrap');
+  var active=false, moved=false, px=0, py=0, sx=0, sy=0, pid=null;
+  cw.addEventListener('pointerdown', function(e){
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.target.closest('.node')) return;
+    active = true; moved = false; pid = e.pointerId;
+    px = e.clientX; py = e.clientY; sx = cw.scrollLeft; sy = cw.scrollTop;
+    if (cw.setPointerCapture && pid != null){ try{ cw.setPointerCapture(pid); }catch(_){/**/} }
+  });
+  cw.addEventListener('pointermove', function(e){
+    if (!active) return;
+    var dx = e.clientX - px, dy = e.clientY - py;
+    if (!moved && (Math.abs(dx) > 5 || Math.abs(dy) > 5)){ moved = true; cw.classList.add('panning'); }
+    if (moved){ cw.scrollLeft = sx - dx; cw.scrollTop = sy - dy; }
+  });
+  function up(){
+    if (!active) return;
+    active = false; cw.classList.remove('panning');
+    if (cw.releasePointerCapture && pid != null){ try{ cw.releasePointerCapture(pid); }catch(_){/**/} }
+    pid = null;
+  }
+  cw.addEventListener('pointerup', up);
+  cw.addEventListener('pointercancel', up);
+  cw.addEventListener('click', function(e){
+    if (moved){ moved = false; e.stopPropagation(); e.preventDefault(); return; }
+    if (!e.target.closest('.node')){ sel = null; renderAll(); }
+  }, true);
 })();
 
-/* ---------- wiring ---------- */
-$('bRoot').onclick=addRoot;
-$('bSave').onclick=saveJSON;
-$('bOpen').onclick=function(){$('fileIn').click()};
-$('fileIn').onchange=function(e){if(e.target.files[0])loadJSON(e.target.files[0]);e.target.value=''};
-$('bCopy').onclick=copyTable;
-$('bDrawio').onclick=exportDrawio;
-window.onbeforeunload=function(){return nodes.size?true:null};
+document.addEventListener('keydown', function(e){
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && String(e.key).toLowerCase() === 'z'){
+    e.preventDefault(); undo();
+  }
+});
+
+function showTab(which){
+  var org = which === 'org';
+  $('tabOrg').style.display  = org ? 'flex' : 'none';
+  $('tabFlow').style.display = org ? 'none' : 'block';
+  $('tabBtnOrg').classList.toggle('active', org);
+  $('tabBtnFlow').classList.toggle('active', !org);
+  if (!org) renderFlow();
+}
+$('tabBtnOrg').onclick  = function(){ showTab('org'); };
+$('tabBtnFlow').onclick = function(){ showTab('flow'); };
+
+// Nút thu/mở dùng chung cho mọi section (▴ = đang mở, ▸ = đang thu)
+function wireCollapse(btnId, bodyId){
+  var b = $(btnId), body = $(bodyId), open = true;
+  b.onclick = function(){
+    open = !open;
+    body.style.display = open ? '' : 'none';
+    b.textContent = open ? '▴' : '▸';
+  };
+}
+wireCollapse('tglFin', 'finBody');
+wireCollapse('tglGrp', 'grpBody');
+wireCollapse('tglFc',  'fcBody');
+wireCollapse('tglRes', 'resBody');
+
+// Tab Sơ đồ: ẩn/hiện sơ đồ (bảng chiếm toàn màn hình) và ẩn/hiện panel
+var chartHidden = false, panelHidden = false;
+$('bTglChart').onclick = function(){
+  chartHidden = !chartHidden;
+  document.querySelector('main').style.display = chartHidden ? 'none' : 'flex';
+  $('tableSec').classList.toggle('full', chartHidden);
+  this.textContent = chartHidden ? 'Hiện sơ đồ' : 'Ẩn sơ đồ';
+};
+$('bTglPanel').onclick = function(){
+  panelHidden = !panelHidden;
+  $('panel').style.display = panelHidden ? 'none' : '';
+  this.textContent = panelHidden ? 'Hiện panel' : 'Ẩn panel';
+};
+
+$('bRoot').onclick   = addRoot;
+$('bSave').onclick   = saveJSON;
+$('bOpen').onclick   = function(){ $('fileIn').click(); };
+$('fileIn').onchange = function(e){ if (e.target.files[0]) loadJSON(e.target.files[0]); e.target.value=''; };
+$('bCopy').onclick   = copyTable;
+$('bDrawio').onclick = exportDrawio;
+$('bUndo').onclick   = undo;
+$('bUnfocus').onclick= clearFocus;
+
+$('finCfo').oninput  = function(){ snap('fin:cfo');  finance.cfo  = this.value; refreshFlowResultSoon(); };
+$('finGdtc').oninput = function(){ snap('fin:gdtc'); finance.gdtc = this.value; refreshFlowResultSoon(); };
+$('finTptc').oninput = function(){ snap('fin:tptc'); finance.tptc = this.value; refreshFlowResultSoon(); };
+
+$('bAddGrp').onclick = addGroup;
+$('bAddFc').onclick  = addFc;
+$('fcFilter').oninput = applyFcFilter;
+$('bPaste').onclick  = function(){
+  var pb = $('pasteBox');
+  pb.style.display = (pb.style.display === 'none' || !pb.style.display) ? 'block' : 'none';
+};
+$('bPasteGo').onclick     = function(){ importPaste($('pasteTa').value); };
+$('bPasteCancel').onclick = function(){ $('pasteTa').value=''; $('pasteBox').style.display='none'; };
+$('bFlowView').onclick = function(){
+  flowViewByFc = !flowViewByFc;
+  this.textContent = flowViewByFc ? 'Đang xem: từng FC' : 'Đang xem: theo nhóm';
+  renderFlowResult();
+};
+$('bCopyFlow').onclick = copyFlowTable;
+
+var tblCollapsed = false;
+$('bTgl').onclick = function(){
+  tblCollapsed = !tblCollapsed;
+  $('tblHost').style.display = tblCollapsed ? 'none' : 'flex';
+  this.textContent = tblCollapsed ? 'Mở ▴' : 'Thu gọn ▾';
+};
+
+window.onbeforeunload = function(){ return (dirty && nodes.size) ? true : null; };
+
 renderAll();
 </script>
 </body>
