@@ -60,9 +60,9 @@
   .node.sel{border-width:2.5px;box-shadow:0 1px 5px rgba(0,0,0,.35)}
   .node .tt{position:absolute;right:5px;top:3px;font-size:10.5px;color:#333;opacity:.75}
   .node .st{position:absolute;right:5px;top:17px;font-size:11px;color:#7a5b00}
-  .node .vh{position:absolute;right:5px;top:31px;font-size:9.5px;font-weight:700;color:#0b6b80;
-            background:rgba(255,255,255,.75);border-radius:2px;padding:0 2px}
-  .node .hid{position:absolute;right:4px;bottom:3px;font-size:10.5px;color:#333;
+  .node .vh{position:absolute;right:4px;bottom:3px;font-size:9.5px;font-weight:700;color:#0b6b80;
+            background:rgba(255,255,255,.85);border:1px solid #7bc4d4;border-radius:2px;padding:0 3px}
+  .node .hid{position:absolute;left:4px;bottom:3px;font-size:10.5px;color:#333;
              background:#fff;border:1px solid #999;border-radius:3px;padding:0 4px;cursor:pointer}
   .node .bd{font-weight:700;font-size:12px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;
             -webkit-box-orient:vertical;overflow:hidden;word-break:break-word;padding-right:20px}
@@ -106,13 +106,17 @@
   #tabRules{flex:1;min-height:0;overflow:auto;padding:12px;display:none}
   #rulesWrap{display:flex;gap:16px;align-items:flex-start}
   #rulesMain{flex:1;min-width:0}
-  #rulesSide{width:300px;flex:none}
-  #ruleTbl td.slot{height:56px;vertical-align:top;background:#fdfdfd}
+  #rulesSide{width:300px;flex:none;position:sticky;top:0}
+  #roleList{max-height:56vh;overflow:auto;padding-right:2px}   /* list dài tự cuộn — phần trên đứng yên */
+  #ruleTbl td.slot{height:96px;vertical-align:top;background:#fdfdfd}
   #ruleTbl td.slot.over{background:#e8f2ff}
   #ruleTbl td.flowName{white-space:nowrap;font-weight:600;background:#f8f8f8}
-  .chip{display:flex;align-items:center;gap:5px;border:1px solid #666;border-radius:3px;
-        background:#fff;padding:2px 5px;margin:2px 0;font-size:12px}
-  .chip .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip{display:block;border:1px solid #666;border-radius:3px;
+        background:#fff;padding:3px 6px;margin:2px 0;font-size:12px}
+  .chip .chipTop{display:flex;align-items:center;justify-content:space-between;gap:5px}
+  .chip .cn{font-weight:600;font-size:11.5px;line-height:1.25;margin-top:1px;
+            display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+  .chip .cp{font-style:italic;font-size:11px;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .chip .sc{font-size:10px;border:1px solid #999;border-radius:2px;padding:0 3px;cursor:pointer;
             white-space:nowrap;background:#f4f4f4}
   .chip .sc.vh{background:#d9f2f8;border-color:#4aa3b8}
@@ -146,6 +150,8 @@
   /* Bảng Nhóm FC + FC: input trần trong ô, lọc nhanh, cuộn riêng ~1/2 view, hàng đầu freeze (th sticky) */
   .inScroll{max-height:48vh}
   .resScroll{max-height:60vh}   /* bảng luồng duyệt: cuộn trong khung riêng để header luôn trong tầm nhìn */
+  #fcTbl{width:100%;min-width:706px}                            /* giãn hết card, hẹp quá thì cuộn ngang */
+  #grpTbl{width:100%;min-width:628px}
   #fcTbl input,#fcTbl select,#grpTbl input,#grpTbl select{width:100%;font:inherit;font-size:13px;padding:3px 5px;border:1px solid #ccc;border-radius:3px}
   #fcTbl td,#grpTbl td{white-space:normal}
   #pasteBox{display:none;margin-top:8px}
@@ -219,7 +225,7 @@
     <div id="rulesMain">
       <div class="cardH">Ma trận luồng duyệt — kéo box vai trò từ cột phải thả vào ô</div>
       <div class="scrollTbl">
-        <table id="ruleTbl" style="table-layout:fixed;width:1026px">
+        <table id="ruleTbl" style="table-layout:fixed;width:100%;min-width:1026px">
           <colgroup>
             <col style="width:78px"><col style="width:158px"><col style="width:158px">
             <col style="width:158px"><col style="width:158px"><col style="width:158px"><col style="width:158px">
@@ -262,7 +268,7 @@
   <div class="flowTop" id="flowInputs">
     <!-- Nhóm Fund Center: bảng Mã FCG / Tên / CBQLNS + lọc nhanh (cùng ngôn ngữ với bảng FC) -->
     <section id="grpSec" class="flowCard">
-      <div class="cardH">Nhóm Fund Center <span id="grpCount" class="gcnt"></span> <button id="tglGrp" class="tgl">▴</button></div>
+      <div class="cardH">Nhóm Fund Center <span id="grpCount" class="gcnt"></span></div>
       <div id="grpBody">
         <div class="miniRow">
           <input id="grpFilter" class="w2" placeholder="Lọc nhanh theo mã / tên nhóm…" autocomplete="off">
@@ -281,7 +287,7 @@
 
     <!-- Fund Center: bảng 3 cột + lọc + dán từ Excel -->
     <section id="fcSec" class="flowCard">
-      <div class="cardH">Fund Center <span id="fcCount" class="gcnt"></span> <button id="tglFc" class="tgl">▴</button></div>
+      <div class="cardH">Fund Center <span id="fcCount" class="gcnt"></span></div>
       <div id="fcBody">
         <div class="miniRow">
           <input id="fcFilter" class="w2" placeholder="Lọc nhanh theo mã / tên / nhóm…" autocomplete="off">
@@ -519,9 +525,22 @@ function toggleStar(id){
   var n = nodes.get(id); n.star = !n.star;
   renderAll();
 }
+function vhRootId(){
+  var id = null;
+  nodes.forEach(function(n){ if (n.vh && !id) id = n.id; });
+  return id;
+}
 function toggleVh(id){
+  var n = nodes.get(id);
+  if (!n.vh){                                  // chỉ được 1 nhánh Vận hành trên toàn cây
+    var ex = vhRootId();
+    if (ex && ex !== id){
+      msg('Chỉ được 1 nhánh Vận hành — đang ở "' + dispName(nodes.get(ex)) + '", bỏ tick ở đó trước');
+      renderPanel(); return;
+    }
+  }
   snap(null);
-  var n = nodes.get(id); n.vh = !n.vh;
+  n.vh = !n.vh;
   renderAll();
 }
 function isAncestor(a, b){
@@ -762,6 +781,12 @@ function renderPanel(){
   var ck = $('fStar'); ck.checked = !!n.star;
   ck.onchange = function(){ toggleStar(sel); };
   var cvh = $('fVh'); cvh.checked = !!n.vh;
+  var vhEx = vhRootId();
+  if (vhEx && vhEx !== sel){                   // đã có nhánh VH ở box khác -> khóa checkbox
+    cvh.disabled = true;
+    cvh.parentElement.title = 'Chỉ được 1 nhánh Vận hành — đang ở "' + dispName(nodes.get(vhEx)) + '"';
+    cvh.parentElement.style.opacity = '.55';
+  }
   cvh.onchange = function(){ toggleVh(sel); };
 
   if (!n.children.length) $('bClps').disabled = true;
@@ -902,7 +927,7 @@ function applyState(d){
   })(d.roots);
   function genId(){ do { maxN++; } while (used.has('n'+maxN)); return 'n'+maxN; }
 
-  var tN = new Map(), tRoots = [], tFocus = null;
+  var tN = new Map(), tRoots = [], tFocus = null, tVhSeen = false;
   function mk(o, parentId){
     if (!o || typeof o !== 'object') throw new Error('bad node');
     var pr = parentId ? rnum(tN.get(parentId).t) : 0;
@@ -910,12 +935,14 @@ function applyState(d){
     if (r < 0) r = parentId ? Math.min(8, pr+1) : 0;
     if (parentId && r < pr) r = pr;
     var id = (typeof o.id === 'string' && /^n\d+$/.test(o.id) && !tN.has(o.id)) ? o.id : genId();
+    var vhFlag = !!o.vh && !tVhSeen;             // chỉ giữ 1 nhánh Vận hành khi mở file
+    if (vhFlag) tVhSeen = true;
     tN.set(id, { id:id,
                  dept:  String(o.dept  || '').toUpperCase(),
                  title: String(o.title || ''),
                  person:String(o.person|| ''),
                  t: LEVELS[r],
-                 star: !!o.star, vh: !!o.vh, collapsed: !!o.collapsed,
+                 star: !!o.star, vh: vhFlag, collapsed: !!o.collapsed,
                  parent: parentId, children: [] });
     if (o.focus && !tFocus) tFocus = id;
     (o.children || []).forEach(function(c){ tN.get(id).children.push(mk(c, id)); });
@@ -1053,14 +1080,17 @@ function roleBoxText(rb){                     // nội dung đầy đủ (nhiề
   }
   return [rb.title, rb.person].filter(Boolean).join('\n') || '(chưa đặt tên)';
 }
-function roleBoxName(rb){                     // 1 dòng ngắn cho chip/palette
-  if (!rb) return '—';
+// {t: chức danh, p: người} — chip/palette chỉ hiện 2 thông tin cần thiết, không kèm khối/phòng
+function rolePair(rb){
+  if (!rb) return { t:'—', p:'' };
   if (rb.kind === 'node'){
     var n = nodes.get(rb.nodeId);
-    return n ? dispName(n) : '(đã xóa)';
+    return n ? { t: n.title || n.dept || '(chưa nhập)', p: n.person || '' }
+             : { t:'(box sơ đồ đã bị xóa)', p:'' };
   }
-  return rb.title || rb.person || '(chưa đặt tên)';
+  return { t: rb.title || '(chưa đặt tên)', p: rb.person || '' };
 }
+function roleBoxName(rb){ return rolePair(rb).t; }
 // Nhánh của CBQLNS: đi ngược tổ tiên, gặp cờ VẬN HÀNH -> 'VH'; không gặp -> 'REST' (Còn lại)
 function segmentOf(cb){
   var a = cb;
@@ -1315,6 +1345,8 @@ function renderFlowResult(){
   var sc = document.createElement('div'); sc.className = 'scrollTbl resScroll';   // header freeze khi cuộn
   var tb = document.createElement('table');
   tb.style.tableLayout = 'fixed';
+  tb.style.width = '100%';                                       // giãn hết card, hẹp quá thì cuộn ngang
+  tb.style.minWidth = (COLW_FLOW.head + COLW_FLOW.flow + COLW_FLOW.step * COLS.length) + 'px';
   var cg = document.createElement('colgroup');
   var c0 = document.createElement('col'); c0.style.width = COLW_FLOW.head + 'px'; cg.appendChild(c0);
   var c1 = document.createElement('col'); c1.style.width = COLW_FLOW.flow + 'px'; cg.appendChild(c1);
@@ -1459,24 +1491,33 @@ function deleteRole(rb){
 }
 // Gõ tên trong palette -> vá nhãn chip đích danh, không đập cả tab (giữ focus input)
 function patchRoleChips(rb){
-  document.querySelectorAll('#ruleTbody .chip[data-rid="' + rb.id + '"] .nm').forEach(function(el){
-    el.textContent = roleBoxName(rb);
-    el.title = roleBoxText(rb);
+  var pr = rolePair(rb);
+  document.querySelectorAll('#ruleTbody .chip[data-rid="' + rb.id + '"]').forEach(function(ch){
+    ch.title = roleBoxText(rb);
+    var cn = ch.querySelector('.cn'); if (cn) cn.textContent = pr.t;
+    var cp = ch.querySelector('.cp');
+    if (pr.p){
+      if (!cp){ cp = document.createElement('div'); cp.className = 'cp'; ch.appendChild(cp); }
+      cp.textContent = pr.p;
+    } else if (cp) cp.remove();
   });
 }
 function chipEl(flow, col, scope, rid){
-  var rb = roleById(rid);
+  var rb = roleById(rid), pr = rolePair(rb);
   var ch = document.createElement('div'); ch.className = 'chip'; ch.dataset.rid = rid;
+  var top = document.createElement('div'); top.className = 'chipTop';
   var sc = document.createElement('span');
   sc.className = 'sc' + (scope === 'VH' ? ' vh' : scope === 'REST' ? ' rest' : '');
   sc.textContent = SEG_LABEL[scope];
   sc.title = 'Bấm để chuyển phạm vi: Tất cả → Vận hành → Còn lại';
   sc.onclick = function(){ cycleScope(flow, col, scope); };
-  var nm = document.createElement('span'); nm.className = 'nm';
-  nm.textContent = roleBoxName(rb); nm.title = roleBoxText(rb);
   var rm = document.createElement('button'); rm.className = 'rm'; rm.textContent = '✕';
   rm.title = 'Bỏ khỏi ô'; rm.onclick = function(){ removeAssign(flow, col, scope); };
-  ch.appendChild(sc); ch.appendChild(nm); ch.appendChild(rm);
+  top.appendChild(sc); top.appendChild(rm);
+  var cn = document.createElement('div'); cn.className = 'cn'; cn.textContent = pr.t;
+  ch.title = roleBoxText(rb);
+  ch.appendChild(top); ch.appendChild(cn);
+  if (pr.p){ var cp = document.createElement('div'); cp.className = 'cp'; cp.textContent = pr.p; ch.appendChild(cp); }
   return ch;
 }
 function renderRules(){
@@ -1560,9 +1601,13 @@ function renderRolePalette(){
       };
       card.appendChild(fT); card.appendChild(fP);
     } else {
-      var tx = document.createElement('div'); tx.className = 'nodeTxt';
-      tx.textContent = roleBoxText(rb);
-      card.appendChild(tx);
+      var pr = rolePair(rb);
+      if (pr.p){
+        var tx = document.createElement('div'); tx.className = 'nodeTxt';
+        tx.style.fontStyle = 'italic';
+        tx.textContent = pr.p;
+        card.appendChild(tx);
+      }
     }
     host.appendChild(card);
   });
@@ -1643,8 +1688,6 @@ function wireCollapse(btnId, bodyId){
     b.textContent = open ? '▴' : '▸';
   };
 }
-wireCollapse('tglGrp', 'grpBody');
-wireCollapse('tglFc',  'fcBody');
 wireCollapse('tglRes', 'resBody');
 
 // Tab Sơ đồ: ẩn/hiện sơ đồ (bảng chiếm toàn màn hình) và ẩn/hiện panel
