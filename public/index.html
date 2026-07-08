@@ -48,11 +48,22 @@
           padding:8px 12px;border-bottom:1px solid #eee}
   #focusChip{font-size:12.5px;color:#555;border:1px dashed #999;border-radius:3px;padding:3px 6px}
   #focusChip button{padding:0 5px;font-size:12px;border:none}
-  main{flex:1;min-height:0;display:flex}
+  main{flex:1;min-height:0;display:flex;position:relative}   /* neo minimap overlay */
   #canvasWrap{flex:1;overflow:auto;background:#fafafa;cursor:grab;touch-action:none}
   #canvasWrap.panning{cursor:grabbing}
-  #canvas{position:relative;min-width:100%;min-height:100%}
+  #canvasSizer{position:relative}                            /* kích thước = world × zoom, tạo vùng cuộn */
+  #canvas{position:relative;transform-origin:0 0}            /* scale(zoom) set bằng JS */
   #svg{position:absolute;left:0;top:0;pointer-events:none}
+
+  /* Minimap: overlay góc dưới-trái vùng canvas, không cuộn theo nội dung */
+  #minimap{position:absolute;left:12px;bottom:12px;width:200px;height:150px;z-index:4;
+           border:1px solid #999;border-radius:3px;background:rgba(255,255,255,.92);
+           box-shadow:0 1px 6px rgba(0,0,0,.18);overflow:hidden;cursor:pointer;touch-action:none}
+  #minimap.hidden{display:none}
+  #miniSvg{position:absolute;left:0;top:0;width:100%;height:100%}
+  #miniView{position:absolute;border:1.5px solid #d97706;background:rgba(217,119,6,.14);
+            cursor:move;pointer-events:none}
+  #zoomLbl{font-size:12.5px;color:#555;min-width:42px;text-align:center}
 
   .node{position:absolute;width:190px;height:104px;border:1px solid #333;background:#fff;
         border-radius:3px;cursor:pointer;overflow:hidden;padding:6px 8px;
@@ -201,6 +212,14 @@
       <button id="bCopy">Copy bảng</button>
       <button id="bDrawio">Xuất .drawio</button>
     </div>
+    <div class="grp seg">
+      <button id="bZoomOut" class="ghost" title="Thu nhỏ">−</button>
+      <button id="bZoomReset" class="ghost" title="Về 100%"><span id="zoomLbl">100%</span></button>
+      <button id="bZoomIn" class="ghost" title="Phóng to">＋</button>
+    </div>
+    <div class="grp">
+      <button id="bZoomFit" class="ghost">Vừa màn hình</button>
+    </div>
     <div class="grp">
       <button id="bTglChart" class="ghost">Ẩn sơ đồ</button>
       <button id="bTglPanel" class="ghost">Ẩn panel</button>
@@ -209,7 +228,8 @@
   </div>
 
   <main>
-    <div id="canvasWrap"><div id="canvas"><svg id="svg"></svg></div></div>
+    <div id="canvasWrap"><div id="canvasSizer"><div id="canvas"><svg id="svg"></svg></div></div></div>
+    <div id="minimap" class="hidden"><svg id="miniSvg"></svg><div id="miniView"></div></div>
     <div id="panel"></div>
   </main>
 
@@ -354,6 +374,11 @@ var GX = 18,  GY = 70;
 var PAD = 20;
 var COLW_ORG  = 190;                    // độ rộng cột bảng phân cấp
 var COLW_FLOW = { head:240, flow:90, step:170 };   // độ rộng cột bảng luồng
+
+// Zoom sơ đồ (view-state tạm, KHÔNG lưu JSON). worldW/H = kích thước world lần render gần nhất.
+var zoom = 1, worldW = 300, worldH = 300;
+var ZMIN = 0.2, ZMAX = 2, ZSTEP = 1.2;
+var MMW = 200, MMH = 150;               // khung minimap
 
 var LEVELS = ['CC','T1','T2','T3','T4','T5','T6','T7','T8'];
 var TCOLOR = {CC:'#5e8cf9',T1:'#ea9651',T2:'#92d050',T3:'#f6d5b9',
@@ -579,8 +604,9 @@ function scrollNodeIntoView(id){
   var L = layout();
   if (!L.vis.has(id)) return;
   var p = L.pos.get(id), cw = $('canvasWrap');
-  cw.scrollLeft = Math.max(0, p.x + BW/2 - cw.clientWidth/2);
-  cw.scrollTop  = Math.max(0, p.y + BH/2 - cw.clientHeight/2);
+  cw.scrollLeft = Math.max(0, (p.x + BW/2)*zoom - cw.clientWidth/2);
+  cw.scrollTop  = Math.max(0, (p.y + BH/2)*zoom - cw.clientHeight/2);
+  syncMiniView();
 }
 function select(id, focusInput){
   sel = id; renderAll();
@@ -672,10 +698,13 @@ function renderCanvas(L){
   L.pos.forEach(function(p){ if (p.x > maxX) maxX = p.x; });
   var W = L.vis.size ? maxX + BW + PAD : 300;
   var H = L.vis.size ? PAD*2 + L.keys.length*(BH+GY) - GY : 300;
-  cv.style.width  = Math.max(W, 300) + 'px';
-  cv.style.height = Math.max(H, 300) + 'px';
-  svg.setAttribute('width',  Math.max(W, 300));
-  svg.setAttribute('height', Math.max(H, 300));
+  W = Math.max(W, 300); H = Math.max(H, 300);
+  worldW = W; worldH = H;
+  cv.style.width  = W + 'px';
+  cv.style.height = H + 'px';
+  svg.setAttribute('width',  W);
+  svg.setAttribute('height', H);
+  applyZoomView();                                  // sizer = world×zoom + scale(zoom)
 
   var NS = 'http://www.w3.org/2000/svg';
   L.vis.forEach(function(id){
@@ -730,6 +759,8 @@ function renderCanvas(L){
   if (focusId && nodes.has(focusId)){
     chip.hidden = false; $('focusName').textContent = dispName(nodes.get(focusId));
   } else chip.hidden = true;
+
+  renderMinimap(L);
 }
 
 function renderPanel(){
@@ -1628,6 +1659,100 @@ function fillRolePick(){
   if (cur && nodes.has(cur)) s.value = cur;
 }
 
+/* ============ [8f] ZOOM + MINIMAP (chỉ tab Sơ đồ, view-state tạm) ============ */
+// Áp zoom hiện tại: sizer nhận kích thước world×zoom (tạo vùng cuộn), canvas scale(zoom).
+function applyZoomView(){
+  var sz = $('canvasSizer');
+  if (sz){ sz.style.width = (worldW*zoom)+'px'; sz.style.height = (worldH*zoom)+'px'; }
+  $('canvas').style.transform = 'scale(' + zoom + ')';
+  var lbl = $('zoomLbl'); if (lbl) lbl.textContent = Math.round(zoom*100) + '%';
+}
+function clampZoom(z){ return Math.min(ZMAX, Math.max(ZMIN, z)); }
+// Zoom quanh 1 điểm màn hình (ax,ay tính theo viewport của canvasWrap); giữ điểm world dưới đó cố định.
+function applyZoom(nz, ax, ay){
+  nz = clampZoom(nz);
+  var cw = $('canvasWrap');
+  if (ax == null){ ax = cw.clientWidth/2;  ay = cw.clientHeight/2; }
+  var wx = (cw.scrollLeft + ax) / zoom;             // toạ độ world dưới con trỏ
+  var wy = (cw.scrollTop  + ay) / zoom;
+  zoom = nz;
+  applyZoomView();
+  cw.scrollLeft = wx*zoom - ax;                     // đưa điểm world về đúng chỗ dưới con trỏ
+  cw.scrollTop  = wy*zoom - ay;
+  syncMiniView();
+}
+function fitZoom(){
+  var cw = $('canvasWrap');
+  var z = Math.min(cw.clientWidth / worldW, cw.clientHeight / worldH, 1);
+  zoom = clampZoom(z);
+  applyZoomView();
+  cw.scrollLeft = 0; cw.scrollTop = 0;
+  syncMiniView();
+}
+
+var miniScale = 1;
+// Vẽ snapshot: mỗi node visible = 1 rect nhỏ (màu theo cấp T). Luôn vẽ khi có node để lúc
+// zoom vượt viewport có thể hiện ngay; quyết định ẩn/hiện để syncMiniView lo (chạy mỗi zoom/cuộn).
+function renderMinimap(L){
+  var mm = $('minimap'), svg = $('miniSvg');
+  if (!mm || !svg) return;
+  if (!L.vis.size){ mm.classList.add('hidden'); return; }
+  miniScale = Math.min(MMW / worldW, MMH / worldH);
+  svg.setAttribute('viewBox', '0 0 ' + worldW + ' ' + worldH);
+  svg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+  var NS = 'http://www.w3.org/2000/svg';
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  L.vis.forEach(function(id){
+    var n = nodes.get(id), p = L.pos.get(id);
+    var r = document.createElementNS(NS, 'rect');
+    r.setAttribute('x', p.x); r.setAttribute('y', p.y);
+    r.setAttribute('width', BW); r.setAttribute('height', BH);
+    r.setAttribute('fill', TCOLOR[n.t] || '#ffffff');
+    r.setAttribute('stroke', id === sel ? '#111' : '#888');
+    r.setAttribute('stroke-width', id === sel ? 6 : 2);
+    svg.appendChild(r);
+  });
+  syncMiniView();
+}
+// Ô viewport trên minimap = vùng world đang hiển thị; đồng thời tự ẩn khi cả sơ đồ đã lọt viewport.
+function syncMiniView(){
+  var mm = $('minimap'), mv = $('miniView'), cw = $('canvasWrap');
+  if (!mm || !mv) return;
+  var needed = $('miniSvg').querySelector('rect') &&
+               (worldW*zoom > cw.clientWidth + 4 || worldH*zoom > cw.clientHeight + 4);
+  mm.classList.toggle('hidden', !needed);
+  if (!needed) return;
+  mv.style.left   = (cw.scrollLeft/zoom * miniScale) + 'px';
+  mv.style.top    = (cw.scrollTop /zoom * miniScale) + 'px';
+  mv.style.width  = Math.min(worldW, cw.clientWidth /zoom) * miniScale + 'px';
+  mv.style.height = Math.min(worldH, cw.clientHeight/zoom) * miniScale + 'px';
+}
+// Bấm/kéo trên minimap: canh vùng nhìn vào điểm world tương ứng (tái dùng mẫu pointer-capture).
+(function(){
+  var mm = $('minimap'), cw = $('canvasWrap');
+  if (!mm) return;
+  var dragging = false, pid = null;
+  function jump(e){
+    var rc = mm.getBoundingClientRect();
+    var wx = (e.clientX - rc.left) / miniScale;         // toạ độ world từ vị trí bấm trên minimap
+    var wy = (e.clientY - rc.top)  / miniScale;
+    cw.scrollLeft = wx*zoom - cw.clientWidth/2;          // canh giữa viewport vào điểm đó
+    cw.scrollTop  = wy*zoom - cw.clientHeight/2;
+    syncMiniView();
+  }
+  mm.addEventListener('pointerdown', function(e){
+    dragging = true; pid = e.pointerId;
+    if (mm.setPointerCapture){ try{ mm.setPointerCapture(pid); }catch(_){/**/} }
+    jump(e); e.preventDefault();
+  });
+  mm.addEventListener('pointermove', function(e){ if (dragging) jump(e); });
+  function up(){ dragging = false;
+    if (mm.releasePointerCapture && pid!=null){ try{ mm.releasePointerCapture(pid); }catch(_){/**/} }
+    pid = null; }
+  mm.addEventListener('pointerup', up);
+  mm.addEventListener('pointercancel', up);
+})();
+
 /* ============ [9] PAN + PHÍM TẮT + NỐI SỰ KIỆN ============ */
 (function(){
   var cw = $('canvasWrap');
@@ -1657,6 +1782,17 @@ function fillRolePick(){
     if (moved){ moved = false; e.stopPropagation(); e.preventDefault(); return; }
     if (!e.target.closest('.node')){ sel = null; renderAll(); }
   }, true);
+
+  // Lăn chuột = zoom quanh con trỏ (kiểu Figma/Miro). Chỉ gắn trên canvas tab Sơ đồ.
+  cw.addEventListener('wheel', function(e){
+    e.preventDefault();
+    var rc = cw.getBoundingClientRect();
+    var factor = e.deltaY < 0 ? ZSTEP : 1/ZSTEP;
+    applyZoom(zoom * factor, e.clientX - rc.left, e.clientY - rc.top);
+  }, { passive:false });
+
+  // Kéo nền / thanh cuộn -> đồng bộ ô viewport trên minimap
+  cw.addEventListener('scroll', syncMiniView);
 })();
 
 document.addEventListener('keydown', function(e){
@@ -1703,6 +1839,11 @@ $('bTglPanel').onclick = function(){
   $('panel').style.display = panelHidden ? 'none' : '';
   this.textContent = panelHidden ? 'Hiện panel' : 'Ẩn panel';
 };
+
+$('bZoomIn').onclick    = function(){ applyZoom(zoom * ZSTEP); };
+$('bZoomOut').onclick   = function(){ applyZoom(zoom / ZSTEP); };
+$('bZoomReset').onclick = function(){ applyZoom(1); };
+$('bZoomFit').onclick   = fitZoom;
 
 $('bRoot').onclick   = addRoot;
 $('bSave').onclick   = saveJSON;
